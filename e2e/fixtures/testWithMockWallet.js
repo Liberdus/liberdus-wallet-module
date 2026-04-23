@@ -1,24 +1,20 @@
 const { expect, test: base } = require("@playwright/test");
 const {
-  clearE2EAirdropData,
   createSnapshot,
-  E2E_BACKEND_ORIGIN,
   resetLocalChain,
-  resetE2eDatabaseFile,
   revertSnapshot,
   rpcCall,
   RPC_URL,
-  startBackendServer,
 } = require("../helpers/hardhatChain");
 const { writeClaimsFixtureFile } = require("../helpers/generatedClaimsFile");
 
 const STORAGE_KEY = "liberdus-airdrop-ui-config";
 const DEFAULT_UI_CONFIG = {
-  apiBaseUrl: E2E_BACKEND_ORIGIN,
+  apiBaseUrl: "",
   explorerBaseUrl: "https://explorer.local.test",
   xAuth: {
     enabled: false,
-    backendUrl: E2E_BACKEND_ORIGIN,
+    backendUrl: "",
   },
 };
 
@@ -385,29 +381,21 @@ const test = base.extend({
   walletDiscoveryMode: ["legacy", { option: true }],
   hardhatChain: [async ({}, use) => {
     await resetLocalChain();
-    resetE2eDatabaseFile();
-    const backendServer = await startBackendServer();
     let baseSnapshotId = await createSnapshot(RPC_URL);
 
-    try {
-      await use({
-        backendUrl: backendServer.url,
-        rpcCall: (method, params = []) => rpcCall(method, params, RPC_URL),
-        async resetToBase(testTitle = "test") {
-          const reverted = await revertSnapshot(baseSnapshotId, RPC_URL);
-          if (!reverted) {
-            throw new Error(`Failed to revert Hardhat snapshot ${baseSnapshotId} before ${testTitle}.`);
-          }
+    await use({
+      rpcCall: (method, params = []) => rpcCall(method, params, RPC_URL),
+      async resetToBase(testTitle = "test") {
+        const reverted = await revertSnapshot(baseSnapshotId, RPC_URL);
+        if (!reverted) {
+          throw new Error(`Failed to revert Hardhat snapshot ${baseSnapshotId} before ${testTitle}.`);
+        }
 
-          clearE2EAirdropData();
-          baseSnapshotId = await createSnapshot(RPC_URL);
-          return baseSnapshotId;
-        },
-        rpcUrl: RPC_URL,
-      });
-    } finally {
-      await backendServer.stop();
-    }
+        baseSnapshotId = await createSnapshot(RPC_URL);
+        return baseSnapshotId;
+      },
+      rpcUrl: RPC_URL,
+    });
   }, { scope: "worker" }],
   isolatedChain: [
     async ({ hardhatChain }, use, testInfo) => {
@@ -423,11 +411,11 @@ const test = base.extend({
       rpcUrl: RPC_URL,
       discoveryMode: walletDiscoveryMode,
       storageKey: STORAGE_KEY,
-      apiBaseUrl: E2E_BACKEND_ORIGIN,
+      apiBaseUrl: "",
       explorerBaseUrl: "https://explorer.local.test",
       xAuth: {
         enabled: false,
-        backendUrl: E2E_BACKEND_ORIGIN,
+        backendUrl: "",
       },
     });
 

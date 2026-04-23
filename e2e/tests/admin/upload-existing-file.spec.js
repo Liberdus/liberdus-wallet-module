@@ -24,12 +24,12 @@ test("admin can upload an existing claims file and gets a duplicate-root warning
   await expect(page.locator("#uploadPreviewBody")).toContainText("90 LIB");
 
   await setFutureDeadline(page, "#startDeadlineInput");
-  await page.getByRole("button", { name: "Save Round to DB" }).click();
+  await page.getByRole("button", { name: "Save Round Locally" }).click();
   await page.getByRole("button", { name: "Fund Total" }).first().click();
   await expect(page.getByText("Fund airdrop complete.")).toBeVisible();
   await page.getByRole("button", { name: "Deploy" }).first().click();
   await expect(page.locator("#currentEpoch")).toHaveText("1");
-  await expect(page.locator("#epochListBody")).toContainText("DB + Chain");
+  await expect(page.locator("#epochListBody")).toContainText("Local + Chain");
   await page.getByRole("button", { name: "Prepare" }).click();
 
   await page.getByRole("button", { name: "Clear Claims" }).click();
@@ -38,7 +38,7 @@ test("admin can upload an existing claims file and gets a duplicate-root warning
   await expect(page.locator("#startRootWarning")).toContainText("already exists on chain");
 });
 
-test("admin can save a large uploaded round to the backend", async ({ page }, testInfo) => {
+test("admin can save a large uploaded round locally", async ({ page }, testInfo) => {
   const claimCount = 600;
   const claimsFile = writeFixtureFile(
     testInfo,
@@ -62,7 +62,7 @@ test("admin can save a large uploaded round to the backend", async ({ page }, te
   await expect(page.locator("#uploadedClaimCount")).toHaveText(`${claimCount} wallets`);
 
   await setFutureDeadline(page, "#startDeadlineInput");
-  await page.getByRole("button", { name: "Save Round to DB" }).click();
+  await page.getByRole("button", { name: "Save Round Locally" }).click();
 
   await expect(page.locator("#selectedRoundLabel")).toContainText("Draft");
   await expect(page.locator("#uploadedClaimCount")).toHaveText(`${claimCount} wallets`);

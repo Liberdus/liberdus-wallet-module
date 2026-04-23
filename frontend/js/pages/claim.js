@@ -754,7 +754,7 @@ function syncXAuthCard() {
   if (!isConfigured) {
     els.xAuthStatus.hidden = false;
     els.xAuthHint.hidden = false;
-    els.xAuthHint.textContent = "This deployment still needs the X auth backend and callback configured.";
+    els.xAuthHint.textContent = "X recovery sign-in is disabled in this frontend-only build.";
     els.xAuthStatus.textContent = "X sign-in is not configured yet.";
     els.xAuthStatus.dataset.tone = "warn";
     els.xAuthButton.textContent = "Sign in with X";
@@ -811,10 +811,10 @@ async function copyWalletAddress() {
   logger.log("Wallet address copied.", "success");
 }
 
-async function postXBackend(path, payload) {
+async function postXService(path, payload) {
   const baseUrl = String(runtime.config?.xAuth?.backendUrl || "").trim().replace(/\/+$/u, "");
   if (!baseUrl) {
-    throw new Error("X sign-in backend URL is not configured.");
+    throw new Error("X sign-in is not configured.");
   }
 
   const csrfToken = String(runtime.xSession?.csrfToken || "").trim();
@@ -880,7 +880,7 @@ async function verifyWalletAndSaveRecovery() {
   syncXAuthCard();
 
   try {
-    const challenge = await postXBackend("/api/x/link/challenge", {
+    const challenge = await postXService("/api/x/link/challenge", {
       walletAddress: runtime.account,
     });
 
@@ -889,7 +889,7 @@ async function verifyWalletAndSaveRecovery() {
     }
 
     const signature = await runtime.signer.signMessage(challenge.message);
-    const result = await postXBackend("/api/x/link/complete", {
+    const result = await postXService("/api/x/link/complete", {
       challengeId: challenge.challengeId,
       walletAddress: runtime.account,
       signature,

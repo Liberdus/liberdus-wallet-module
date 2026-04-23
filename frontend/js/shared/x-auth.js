@@ -49,7 +49,7 @@ async function parseJsonResponse(response) {
 
 function describeErrorPayload(payload) {
   if (!payload || typeof payload !== "object") {
-    return "Unexpected response from X recovery backend.";
+    return "Unexpected response from X recovery service.";
   }
 
   if (typeof payload.error === "string" && payload.error.trim()) {
@@ -60,7 +60,7 @@ function describeErrorPayload(payload) {
     return payload.detail.trim();
   }
 
-  return "Unexpected response from X recovery backend.";
+  return "Unexpected response from X recovery service.";
 }
 
 function cleanupAuthQueryParams() {
@@ -153,8 +153,8 @@ function buildSession(result, profile, previousSession = null) {
   };
 }
 
-async function fetchBackendSession(backendUrl, { required = false } = {}) {
-  const response = await fetch(`${backendUrl}/api/x/session`, {
+async function fetchXSession(serviceUrl, { required = false } = {}) {
+  const response = await fetch(`${serviceUrl}/api/x/session`, {
     credentials: "include",
     cache: "no-store",
   });
@@ -271,7 +271,7 @@ export async function completeXLoginIfPresent(config = {}) {
       };
     }
 
-    const authResult = await fetchBackendSession(xAuth.backendUrl, { required: hasCompletionSignal });
+    const authResult = await fetchXSession(xAuth.backendUrl, { required: hasCompletionSignal });
     if (!authResult) {
       clearXSession();
       return {

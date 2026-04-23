@@ -8,12 +8,12 @@
     "symbol": "BNB",
     "decimals": 18
   },
-  "apiBaseUrl": "https://att.liberdus.com/rewards",
+  "apiBaseUrl": "",
   "deploymentKey": "56:0xc824b958e6b85ebd7b2bf70caa0bcb7218ffd123",
   "xAuth": {
-    "enabled": true,
-    "redirectUri": "https://liberdus.com/rewards/",
-    "backendUrl": "https://att.liberdus.com/rewards"
+    "enabled": false,
+    "redirectUri": "",
+    "backendUrl": ""
   },
   "tokenAddress": "0x5AfdCC93D794762C785Ec14Fb2a24c4aBDbB8aaa",
   "airdropAddress": "0xC824b958E6b85eBd7b2BF70CAA0bCb7218fFd123"

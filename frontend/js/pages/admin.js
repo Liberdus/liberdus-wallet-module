@@ -1243,7 +1243,7 @@ function buildRoundRows() {
       deadline: Number(round.deadline || 0),
       claimedAmount: null,
       totalAmountRaw: BigInt(round.totalAmountRaw),
-      sourceText: "DB draft",
+      sourceText: "Local draft",
       canFundTotal: true,
       canDeploy: true,
       canViewClaims: true,
@@ -1266,7 +1266,7 @@ function buildRoundRows() {
       deadline: Number(chainRow.deadline || 0),
       claimedAmount: chainRow.claimedAmount,
       totalAmountRaw: matchesStoredRound ? BigInt(storedRound.totalAmountRaw) : chainRow.totalAmountRaw,
-      sourceText: matchesStoredRound ? "DB + Chain" : "Chain only",
+      sourceText: matchesStoredRound ? "Local + Chain" : "Chain only",
       canFundTotal: matchesStoredRound,
       canDeploy: false,
       canViewClaims: Boolean(matchesStoredRound),
@@ -1287,7 +1287,7 @@ function buildRoundRows() {
       deadline: Number(round.deadline || 0),
       claimedAmount: null,
       totalAmountRaw: BigInt(round.totalAmountRaw),
-      sourceText: "DB only",
+      sourceText: "Local only",
       canFundTotal: true,
       canDeploy: false,
       canViewClaims: true,
@@ -1575,7 +1575,7 @@ function renderEpochList() {
             ${row.canDeploy ? `<button type="button" class="secondary table-action-button" data-round-deploy="${row.roundId}">Deploy</button>` : ""}
             ${row.canFundTotal ? `<button type="button" class="ghost table-action-button" data-round-fund="${row.roundId}">Fund Total</button>` : ""}
             ${row.canViewClaims ? `<button type="button" class="ghost table-action-button" data-round-claims="${row.roundId}">View Claims</button>` : ""}
-            ${!row.canDeploy && !row.canFundTotal && !row.canViewClaims ? '<span class="hint">No DB record</span>' : ""}
+            ${!row.canDeploy && !row.canFundTotal && !row.canViewClaims ? '<span class="hint">No local record</span>' : ""}
           </td>
         </tr>
       `;
@@ -1944,7 +1944,7 @@ async function loadClaimStatuses(records) {
 
 async function loadRoundClaims(roundId, { scrollIntoView = false } = {}) {
   if (!isClaimsApiConfigured(runtime.config)) {
-    throw new Error("Backend API URL is not configured.");
+    throw new Error("Local claim storage is not available.");
   }
 
   const payload = await fetchStoredRoundClaims(runtime.config, roundId);
@@ -1968,13 +1968,13 @@ async function refreshSelectedRoundClaimStatuses() {
   renderSelectedRoundClaims();
 }
 
-async function saveDraftRoundToBackend() {
+async function saveDraftRoundLocally() {
   if (!runtime.uploadedRound) {
     throw new Error("Prepare a claims JSON file first.");
   }
 
   if (!isClaimsApiConfigured(runtime.config)) {
-    throw new Error("Backend API URL is not configured.");
+    throw new Error("Local claim storage is not available.");
   }
 
   const root = els.startRootInput.value.trim();
@@ -2011,7 +2011,7 @@ async function saveDraftRoundToBackend() {
     });
     await refreshPage();
     await loadRoundClaims(persisted.round.id);
-    logger.log("Draft saved to the backend.", "success");
+    logger.log("Draft saved locally.", "success");
   }
 }
 
@@ -2026,7 +2026,7 @@ async function deployStoredRound(roundId) {
   }
 
   if (!isClaimsApiConfigured(runtime.config)) {
-    throw new Error("Backend API URL is not configured.");
+    throw new Error("Local claim storage is not available.");
   }
 
   await validateFutureDeadlineAgainstChain(Number(selectedRound.deadline));
@@ -2046,9 +2046,17 @@ async function deployStoredRound(roundId) {
   logger.log(`Deploy saved round: submitted ${tx.hash}`);
   const receipt = await tx.wait();
   logger.log(`Deploy saved round: confirmed in block ${receipt.blockNumber}`, "success");
+  const deployedEpoch = Number(await airdrop.currentEpoch());
 
   const persisted = await deploySavedAirdropRound(runtime.config, roundId, {
     txHash: tx.hash,
+    epoch: deployedEpoch,
+    merkleRoot: selectedRound.merkleRoot,
+    deadline: selectedRound.deadline,
+    chainId: runtime.config.chainId,
+    contractAddress: runtime.config.airdropAddress,
+    startBlockNumber: receipt.blockNumber,
+    startBlockHash: receipt.blockHash,
   });
 
   await refreshPage();
@@ -2334,7 +2342,7 @@ function bindEvents() {
   els.startAirdropForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      await saveDraftRoundToBackend();
+      await saveDraftRoundLocally();
     } catch (error) {
       reportError(error, "Save airdrop draft");
     }
@@ -2490,7 +2498,7 @@ function bindEvents() {
     event.preventDefault();
     try {
       if (!isClaimsApiConfigured(runtime.config)) {
-        throw new Error("Backend API URL is not configured.");
+        throw new Error("Local claim storage is not available.");
       }
 
       const rawQuery = String(els.claimLookupInput.value || "").trim();

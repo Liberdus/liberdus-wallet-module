@@ -46,9 +46,6 @@ export async function loadUiConfig() {
     apiBaseUrl: String(
       overrides.apiBaseUrl
       || loaded.apiBaseUrl
-      || overrideXAuth.backendUrl
-      || loadedXAuth.backendUrl
-      || loaded.xBackendUrl
       || ""
     ).trim(),
     deploymentKey: String(loaded.deploymentKey || "").trim(),
@@ -58,14 +55,11 @@ export async function loadUiConfig() {
         : (loaded.explorerBaseUrl || "")
     ).trim(),
     xAuth: {
-      enabled: overrideXAuth.enabled ?? loadedXAuth.enabled ?? true,
+      enabled: overrideXAuth.enabled ?? loadedXAuth.enabled ?? false,
       redirectUri: String(overrideXAuth.redirectUri || loadedXAuth.redirectUri || loaded.xRedirectUri || "").trim(),
       backendUrl: String(
         overrideXAuth.backendUrl
         || loadedXAuth.backendUrl
-        || overrides.apiBaseUrl
-        || loaded.apiBaseUrl
-        || loaded.xBackendUrl
         || ""
       ).trim(),
     },

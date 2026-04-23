@@ -117,7 +117,7 @@
           <div class="panel-title-row">
             <div>
               <h2>Admin Workspace</h2>
-              <p class="hint">Save rounds to the database first, then deploy them from the rounds tab when you are ready. Drafts do not reserve an epoch.</p>
+              <p class="hint">Save rounds in this browser first, then deploy them from the rounds tab when you are ready. Drafts do not reserve an epoch.</p>
             </div>
             <button id="refreshButton" type="button" class="ghost">Refresh</button>
           </div>
@@ -155,7 +155,7 @@
             <div class="panel-title-row">
               <div>
                 <h2>Prepare New Airdrop</h2>
-                <p class="hint">Build or upload a claims set here, save it to the database, then fund and deploy the saved draft from the rounds tab.</p>
+                <p class="hint">Build or upload a claims set here, save it locally, then fund and deploy the saved draft from the rounds tab.</p>
               </div>
             </div>
 
@@ -254,7 +254,7 @@
                 <input id="startDeadlineUnix" type="text" readonly>
               </label>
               <div class="full-width button-row">
-                <button id="startAirdropButton" type="submit">Save Round to DB</button>
+                <button id="startAirdropButton" type="submit">Save Round Locally</button>
                 <button id="clearUploadedButton" type="button" class="ghost" disabled>Clear Claims</button>
               </div>
             </form>
@@ -291,7 +291,7 @@
             <div class="panel-title-row">
               <div>
                 <h2>Airdrop Rounds</h2>
-                <p class="hint">Drafts come from the database. Deployed rows are merged with onchain epochs so you can see what is live, what is only saved, and what still needs funding or deployment.</p>
+                <p class="hint">Drafts come from browser storage. Deployed rows are merged with onchain epochs so you can see what is live, what is only saved, and what still needs funding or deployment.</p>
               </div>
             </div>
 
@@ -467,7 +467,7 @@
             <div class="panel-title-row">
               <div>
                 <h2>Follower Accounts</h2>
-                <p class="hint">Browse the full account table, import the combined CSV used by the backend importer, and save one-off rows for testing.</p>
+                <p class="hint">Browse the full account table, import a combined CSV, and save one-off rows for testing.</p>
               </div>
             </div>
 
@@ -533,7 +533,7 @@
                     <span>Needs recovery</span>
                   </label>
                 </div>
-                <p class="hint">If you mark a new row as a follower, the backend stamps the current time so it behaves like a real snapshot row.</p>
+                <p class="hint">If you mark a new row as a follower, the browser stamps the current time so it behaves like a real snapshot row.</p>
                 <button type="submit">Save Account</button>
               </form>
             </div>

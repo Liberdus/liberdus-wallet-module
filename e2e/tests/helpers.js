@@ -39,7 +39,7 @@ async function startAirdropFromUpload(page, claimsFile, { deadlineSelector = "#s
 
   await page.locator("#uploadClaimsFileInput").setInputFiles(claimsFile);
   await setFutureDeadline(page, deadlineSelector);
-  await page.getByRole("button", { name: "Save Round to DB" }).click();
+  await page.getByRole("button", { name: "Save Round Locally" }).click();
   await page.getByRole("button", { name: "Fund Total" }).first().click();
   await page.getByText("Fund airdrop complete.").waitFor();
   await page.getByRole("button", { name: "Deploy" }).first().click();
@@ -50,7 +50,7 @@ async function startAirdropFromUpload(page, claimsFile, { deadlineSelector = "#s
     await page.getByRole("button", { name: "Refresh" }).click();
     await expect(page.locator("#currentEpoch")).toHaveText(String(currentEpoch + 1));
   }
-  await expect(page.locator("#epochListBody")).toContainText("DB + Chain");
+  await expect(page.locator("#epochListBody")).toContainText("Local + Chain");
   await page.getByRole("button", { name: "Prepare" }).click();
 }
 

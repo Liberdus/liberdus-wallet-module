@@ -54,7 +54,13 @@ async function main() {
     tokenAddress: await token.getAddress(),
     dustTokenAddress: await dustToken.getAddress(),
     airdropAddress: await airdrop.getAddress(),
+    apiBaseUrl: "",
     deploymentKey: `local:${crypto.randomUUID()}`,
+    xAuth: {
+      enabled: false,
+      redirectUri: "",
+      backendUrl: "",
+    },
     generatedAt: new Date().toISOString(),
   };
 
