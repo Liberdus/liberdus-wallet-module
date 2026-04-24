@@ -1,6 +1,6 @@
-# liberdus-airdrop
+# liberdus-wallet-module
 
-Frontend-only wallet-connected airdrop dapp and Hardhat test harness for Liberdus.
+Frontend-only wallet module base and Hardhat test harness for Liberdus dapps.
 
 This repo keeps the Solidity contracts, static claimant/admin UIs, local Hardhat deployment scripts, and Playwright coverage. It no longer requires a backend server or database. Admin-created rounds, claim proofs, account rows, and recovery-import test data are stored in the local browser for the active `deploymentKey`.
 
@@ -51,7 +51,7 @@ npm run deploy:local
 npm run fund:owner:local
 npm run serve
 npm run test:e2e
-npm run merkle -- .\examples\my-round.claims.json
+npm run merkle -- .\path\to\my-round.claims.json
 ```
 
 ## BSC Deployment

@@ -1,23 +1,17 @@
-# Adding a New Airdrop
+# Adding A Local Airdrop Round
 
-This repo now uses a single raw claims JSON per round.
+This repo is a frontend-only local test harness. It does not use a backend server or database.
 
-That same raw file is used for:
+The admin page stores round metadata and claim proofs in browser `localStorage`, scoped by the active `deploymentKey` from `frontend/config.local.json` or `frontend/config.json`. The claimant page reads deployed rounds from that same local browser storage and verifies the round against onchain epoch state before showing a claim.
 
-1. calculating the Merkle root
-2. funding the contract
-3. publishing claim data for the frontend
+Clearing site data removes saved rounds, account rows, and recovery-import test data.
 
-The claimant page does not use stored proof artifacts. It loads the raw claims JSON, rebuilds the Merkle tree in the browser, and generates proofs client-side.
+## 1. Create Claims JSON
 
-## 1. Create The Raw Claims JSON
+You can create claims JSON in either of these ways:
 
-You can create the raw claims JSON in either of these ways:
-
-1. use the admin page builder to enter wallet addresses and amounts, then download the generated JSON file
-2. create a file manually under [examples](C:/Users/Chris/Documents/Code/liberdus/follower-campaign/liberdus-airdrop/examples) with one entry per wallet
-
-The generated file should contain one entry per wallet.
+1. Use the admin page builder to enter wallet addresses and amounts, then download the generated JSON file.
+2. Create a JSON file manually in any local folder with one entry per wallet.
 
 Example:
 
@@ -38,12 +32,12 @@ Example:
 
 Rules:
 
-- `index` must be unique per row
-- `index` should usually start at `0` and increase by `1`
-- `account` must be a valid EVM address
-- each wallet should appear only once per round
-- use `amount` for human token units like `"100"` or `"250.5"`
-- if you already have base units, you can use `amountRaw` instead of `amount`
+- `index` must be unique per row.
+- `index` should usually start at `0` and increase by `1`.
+- `account` must be a valid EVM address.
+- Each wallet should appear only once per round.
+- Use `amount` for human token units like `"100"` or `"250.5"`.
+- If you already have base units, use `amountRaw` instead of `amount`.
 
 Example using `amountRaw`:
 
@@ -59,12 +53,12 @@ Example using `amountRaw`:
 
 ## 2. Calculate The Merkle Root
 
-You can calculate the root either in the admin UI or with the CLI.
+You can calculate the root in the admin UI or with the CLI.
 
 CLI:
 
 ```bash
-npm run merkle -- .\examples\my-round.claims.json
+npm run merkle -- .\path\to\my-round.claims.json
 ```
 
 That prints:
@@ -73,89 +67,73 @@ That prints:
 - claim count
 - total rewards
 
-If you want a JSON summary instead:
+For a JSON summary:
 
 ```bash
-npm run merkle -- .\examples\my-round.claims.json --stdout
+npm run merkle -- .\path\to\my-round.claims.json --stdout
 ```
 
-## 3. Fund And Start The Airdrop
+## 3. Save The Round Locally
 
-Open the admin page:
+Open [frontend/admin.html](frontend/admin.html), connect the owner wallet, then use the `Prepare` tab.
 
-- [admin.html](C:/Users/Chris/Documents/Code/liberdus/follower-campaign/liberdus-airdrop/frontend/admin.html)
+1. Build claims in `Build Claims JSON` and click `Use Built Claims`, or upload an existing claims JSON file.
+2. Verify the preview table, total rewards, and calculated root.
+3. Enter the deadline.
+4. Click `Save Round Locally`.
 
-Then:
+Saving locally stores the draft round plus rebuilt claim proofs in browser storage. Nothing is written to a backend or database.
 
-1. connect the owner wallet
-2. either build the raw claims JSON in `Build Claims JSON` and click `Use Built Claims`, or upload an existing raw claims JSON file
-3. if you used the builder, click `Download JSON` to save the deployable raw claims file
-4. verify the preview table, total rewards, and calculated root
-5. optionally click `Fund Contract With Uploaded Total`
-6. enter the deadline
-7. submit `Start New Airdrop`
+## 4. Fund And Deploy The Saved Draft
 
-The contract will reject:
+Open the `Rounds` tab after saving the draft.
+
+1. Click `Fund Total` if the airdrop contract needs more LIB.
+2. Click `Deploy` on the saved draft row.
+3. Confirm the wallet transaction.
+
+Deployment calls `startNewAirdrop(root, deadline)` on the local or configured airdrop contract. After the transaction confirms, the admin page marks the saved browser-local round as deployed and links it to the onchain epoch.
+
+The contract rejects:
 
 - zero roots
 - past deadlines
 
-## 4. Finalize In The Admin UI
+## 5. Verify On The Claimant Page
 
-The claimant page now reads round data from the backend database, not from checked-in claim manifests.
+After deploying the saved round:
 
-After you upload or build the raw claims JSON in the admin page and successfully start the airdrop, the admin flow finalizes the round into SQLite automatically.
+1. Open [frontend/index.html](frontend/index.html).
+2. Connect a wallet that has an allocation.
+3. Confirm the claim appears.
+4. Confirm the displayed amount matches the claims JSON.
+5. Test a claim.
 
-Notes:
-
-- the epoch in the raw claims JSON must still match the on-chain round you start
-- the same raw claims JSON should be kept available for auditability or future review, but it does not need to live under `frontend/claims/`
-
-## 5. Verify
-
-After finalizing the round:
-
-1. reload the claimant page
-2. connect a wallet that has an allocation
-3. confirm the claim appears
-4. confirm the displayed amount matches the raw claims JSON
-5. test a claim
+The claimant page only shows rounds that are both present in browser-local storage and live on chain with a matching Merkle root and active deadline.
 
 ## Optional Deadline Updates
 
 If you need to close or reschedule an epoch after launch:
 
-1. open the admin page
-2. use `Epoch Management`
-3. set a new future deadline, or disable the epoch by setting its deadline to `0`
+1. Open the admin page.
+2. Use `Contract` or `Epoch Management` controls.
+3. Set a new future deadline, or disable the epoch by setting its deadline to `0`.
 
 The claimant page treats a deadline of `0` as closed.
 
 ## Summary
 
-The normal workflow is:
+The normal local workflow is:
 
-1. create raw claims JSON in the admin page builder or in `examples/`
-2. download or save that raw claims JSON file
-3. calculate the root in the admin page or with `npm run merkle`
-4. fund the contract
-5. start the new airdrop
-6. confirm the admin flow finalizes the round into the backend DB
+1. Create claims JSON in the admin page builder or a local file.
+2. Calculate the root in the admin page or with `npm run merkle`.
+3. Save the round locally from the `Prepare` tab.
+4. Fund the contract if needed.
+5. Deploy the saved draft from the `Rounds` tab.
+6. Verify the claimant page shows the deployed round.
 
-## Frontend Config Publishing
+## Frontend Config
 
-Hosted deployments should publish exactly one runtime config file as `frontend/config.json`.
+Local development uses the ignored `frontend/config.local.json` when running on `localhost`. `npm run deploy:local` writes that file with local Hardhat addresses and a fresh `deploymentKey`.
 
-Use:
-
-```bash
-npm run publish:config:test
-```
-
-or:
-
-```bash
-npm run publish:config:prod
-```
-
-Local development still uses the ignored `frontend/config.local.json` when running on `localhost`.
+Hosted deployments should serve one runtime config file as `frontend/config.json`. You can use `frontend/config.test.json` or `frontend/config.prod.json` as templates, then fill in the deployed contract addresses and `deploymentKey`.

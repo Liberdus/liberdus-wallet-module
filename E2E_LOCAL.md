@@ -117,7 +117,7 @@ This means:
 
 ## Files To Know
 
-- [playwright.config.js](/C:/Users/Chris/.codex/worktrees/9939/liberdus-airdrop/playwright.config.js)
-- [e2e/fixtures/testWithMockWallet.js](/C:/Users/Chris/.codex/worktrees/9939/liberdus-airdrop/e2e/fixtures/testWithMockWallet.js)
-- [e2e/helpers/hardhatChain.js](/C:/Users/Chris/.codex/worktrees/9939/liberdus-airdrop/e2e/helpers/hardhatChain.js)
-- [scripts/e2e/static-server.js](/C:/Users/Chris/.codex/worktrees/9939/liberdus-airdrop/scripts/e2e/static-server.js)
+- [playwright.config.js](playwright.config.js)
+- [e2e/fixtures/testWithMockWallet.js](e2e/fixtures/testWithMockWallet.js)
+- [e2e/helpers/hardhatChain.js](e2e/helpers/hardhatChain.js)
+- [scripts/e2e/static-server.js](scripts/e2e/static-server.js)
