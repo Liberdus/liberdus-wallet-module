@@ -430,29 +430,7 @@ function exportRecoveryCsv(submissions) {
   return [headers.join(","), ...rows].join("\n");
 }
 
-export async function requestAdminAccessChallenge(config, payload = {}) {
-  const challengeId = `${Date.now()}:${Math.random().toString(16).slice(2)}`;
-  const walletAddress = normalizeAddress(payload.walletAddress) || String(payload.walletAddress || "").trim();
-  return {
-    challengeId,
-    message: [
-      "Authorize local Liberdus admin access",
-      "",
-      `Wallet: ${walletAddress}`,
-      `Chain ID: ${Number(config?.chainId || 0)}`,
-      `Challenge: ${challengeId}`,
-    ].join("\n"),
-  };
-}
-
-export async function completeAdminAccess(config, payload = {}) {
-  return {
-    accessToken: `local:${payload.challengeId || Date.now()}`,
-    expiresAt: Date.now() + (60 * 60 * 1000),
-  };
-}
-
-export async function fetchAdminAccounts(config, accessToken, options = {}) {
+export async function fetchAdminAccounts(config, options = {}) {
   const state = readState();
   const search = String(options.search || options.query || "").trim().toLowerCase();
   const walletOnly = Boolean(options.walletOnly);
@@ -482,7 +460,7 @@ export async function fetchAdminAccounts(config, accessToken, options = {}) {
   });
 }
 
-export async function importAdminAccounts(config, accessToken, payload = {}) {
+export async function importAdminAccounts(config, payload = {}) {
   const state = readState();
   const rows = parseCsvRows(payload.content || "");
   let importedCount = 0;
@@ -500,7 +478,7 @@ export async function importAdminAccounts(config, accessToken, payload = {}) {
   });
 }
 
-export async function saveAdminAccount(config, accessToken, payload = {}) {
+export async function saveAdminAccount(config, payload = {}) {
   const state = readState();
   const account = saveAccountInState(state, {
     username: payload.username,
@@ -518,7 +496,7 @@ export async function saveAdminAccount(config, accessToken, payload = {}) {
   });
 }
 
-export async function fetchAdminRecoverySubmissions(config, accessToken, options = {}) {
+export async function fetchAdminRecoverySubmissions(config, options = {}) {
   const state = readState();
   const search = String(options.search || options.query || "").trim().toLowerCase();
   const submissions = state.recoverySubmissions
@@ -546,7 +524,7 @@ export async function fetchAdminRecoverySubmissions(config, accessToken, options
   });
 }
 
-export async function importAdminRecoverySubmissions(config, accessToken, payload = {}) {
+export async function importAdminRecoverySubmissions(config, payload = {}) {
   const state = readState();
   let parsed;
   try {
@@ -571,7 +549,7 @@ export async function importAdminRecoverySubmissions(config, accessToken, payloa
   });
 }
 
-export async function exportAdminRecoverySubmissions(config, accessToken, format = "json") {
+export async function exportAdminRecoverySubmissions(config, format = "json") {
   const state = readState();
   const normalizedFormat = String(format || "json").trim().toLowerCase();
   const submissions = state.recoverySubmissions

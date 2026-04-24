@@ -11,7 +11,7 @@ function writeFixtureFile(testInfo, name, content) {
   return filePath;
 }
 
-test("admin can manage accounts and recovery submissions from the accounts tab", async ({ page }, testInfo) => {
+test("admin can manage accounts and recovery submissions from the accounts tab", async ({ page, mockWallet }, testInfo) => {
   const accountsCsvPath = writeFixtureFile(testInfo, "accounts.csv", [
     "x_username,wallet_address,x_user_id,is_follower,needs_recovery,snapshot_history_json",
     "alpha,0x70997970c51812dc3a010c7d01b50e0d17dc79c8,111,true,false,\"[\"\"2026-04-01T12:00:00.000Z\"\", \"\"2026-04-15T12:00:00.000Z\"\"]\"",
@@ -37,6 +37,9 @@ test("admin can manage accounts and recovery submissions from the accounts tab",
 
   await page.goto("admin.html");
   await connectViaWalletPicker(page);
+  await mockWallet.failNextRequest(page, "personal_sign", {
+    message: "Accounts tab should not request an admin signature.",
+  });
 
   await page.getByRole("button", { name: "Accounts", exact: true }).click();
   await expect(page.locator("#accountsPaginationLabel")).toContainText("0 accounts");

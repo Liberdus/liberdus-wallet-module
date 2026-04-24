@@ -35,11 +35,8 @@ import {
   isClaimsApiConfigured,
   saveAirdropRound,
   deploySavedAirdropRound,
-  requestAirdropSaveChallenge,
 } from "../shared/claims.js";
 import {
-  requestAdminAccessChallenge,
-  completeAdminAccess,
   fetchAdminAccounts,
   importAdminAccounts,
   saveAdminAccount,
@@ -88,9 +85,6 @@ const runtime = {
   tokenSymbol: "LIB",
   chainTimestamp: 0,
   activeAdminTab: "prepare",
-  adminAccessToken: "",
-  adminAccessExpiresAt: 0,
-  adminAccessPromise: null,
   managementSummary: {
     accountCount: 0,
     followerCount: 0,
@@ -408,69 +402,15 @@ function renderExplorerAddress(address) {
   return `<a class="table-address-link" href="${explorerUrl}" target="_blank" rel="noreferrer noopener">${codeLabel}</a>`;
 }
 
-function resetAdminAccess() {
-  runtime.adminAccessToken = "";
-  runtime.adminAccessExpiresAt = 0;
-  runtime.adminAccessPromise = null;
-}
-
-function isAdminAccessError(error) {
-  const message = String(error?.message || "");
-  return /admin access|current contract owner/i.test(message);
-}
-
-async function ensureAdminAccess() {
+function ensureLocalAdminAccess() {
   if (!isOwner()) {
-    throw new Error("Only the current owner can access follower management.");
-  }
-
-  const tokenIsFresh = runtime.adminAccessToken
-    && Number(runtime.adminAccessExpiresAt || 0) > (Date.now() + 30_000);
-  if (tokenIsFresh) {
-    return runtime.adminAccessToken;
-  }
-
-  if (runtime.adminAccessPromise) {
-    return runtime.adminAccessPromise;
-  }
-
-  runtime.adminAccessPromise = (async () => {
-    const challenge = await requestAdminAccessChallenge(runtime.config, {
-      walletAddress: runtime.account,
-    });
-    const signature = await runtime.signer.signMessage(challenge.message);
-    const session = await completeAdminAccess(runtime.config, {
-      walletAddress: runtime.account,
-      challengeId: challenge.challengeId,
-      signature,
-    });
-
-    runtime.adminAccessToken = String(session.accessToken || "").trim();
-    runtime.adminAccessExpiresAt = Number(session.expiresAt || 0);
-    return runtime.adminAccessToken;
-  })();
-
-  try {
-    return await runtime.adminAccessPromise;
-  } finally {
-    runtime.adminAccessPromise = null;
+    throw new Error("Only the current owner can access local account management.");
   }
 }
 
-async function callAdminApi(callback, { retryOnAuthFailure = true } = {}) {
-  let accessToken = await ensureAdminAccess();
-
-  try {
-    return await callback(accessToken);
-  } catch (error) {
-    if (!retryOnAuthFailure || !isAdminAccessError(error)) {
-      throw error;
-    }
-
-    resetAdminAccess();
-    accessToken = await ensureAdminAccess();
-    return callback(accessToken);
-  }
+async function callLocalAdminData(callback) {
+  ensureLocalAdminAccess();
+  return callback();
 }
 
 function createBuilderRow(overrides = {}) {
@@ -714,7 +654,7 @@ async function fetchAllLinkedWalletAccounts() {
   let page = 1;
 
   while (true) {
-    const payload = await callAdminApi((accessToken) => fetchAdminAccounts(runtime.config, accessToken, {
+    const payload = await callLocalAdminData(() => fetchAdminAccounts(runtime.config, {
       page,
       pageSize: ADMIN_LINKED_WALLET_PAGE_SIZE,
       walletOnly: true,
@@ -1481,7 +1421,7 @@ function applyManagementResponse(payload) {
 }
 
 async function loadAccountsPage(page = 1) {
-  const payload = await callAdminApi((accessToken) => fetchAdminAccounts(runtime.config, accessToken, {
+  const payload = await callLocalAdminData(() => fetchAdminAccounts(runtime.config, {
     page,
     pageSize: Number(els.accountsPageSizeSelect?.value || runtime.accountsPagination.pageSize || 50),
     search: runtime.accountsSearch,
@@ -1495,7 +1435,7 @@ async function loadAccountsPage(page = 1) {
 }
 
 async function loadRecoverySubmissionsPage(page = 1) {
-  const payload = await callAdminApi((accessToken) => fetchAdminRecoverySubmissions(runtime.config, accessToken, {
+  const payload = await callLocalAdminData(() => fetchAdminRecoverySubmissions(runtime.config, {
     page,
     pageSize: Number(els.recoveryPageSizeSelect?.value || runtime.recoveryPagination.pageSize || 50),
     search: runtime.recoverySearch,
@@ -1538,7 +1478,7 @@ async function handleAccountsTemplateDownload() {
 }
 
 async function handleRecoveryExport(format) {
-  const payload = await callAdminApi((accessToken) => exportAdminRecoverySubmissions(runtime.config, accessToken, format));
+  const payload = await callLocalAdminData(() => exportAdminRecoverySubmissions(runtime.config, format));
   const fileName = String(payload?.fileName || `recovery-submissions.${format === "csv" ? "csv" : "json"}`).trim();
   const content = String(payload?.content || "");
   const contentType = String(payload?.contentType || (format === "csv" ? "text/csv" : "application/json")).trim();
@@ -1724,7 +1664,6 @@ function applyOwnerGate() {
   els.connectedAccount.textContent = runtime.config.airdropAddress || "No contract configured";
 
   if (!runtime.provider) {
-      resetAdminAccess();
       els.accountRole.textContent = "Wallet missing";
       els.adminGateMessage.textContent = "Install a compatible browser wallet to manage the airdrop.";
       els.switchNetworkGateButton.hidden = true;
@@ -1734,7 +1673,6 @@ function applyOwnerGate() {
   }
 
   if (!runtime.account) {
-      resetAdminAccess();
       els.accountRole.textContent = "Disconnected";
       els.adminGateMessage.textContent = "Connect the owner or pending owner wallet to view admin controls.";
       els.switchNetworkGateButton.hidden = true;
@@ -1744,7 +1682,6 @@ function applyOwnerGate() {
   }
 
   if (!isReadyChain()) {
-      resetAdminAccess();
       els.accountRole.textContent = "Wrong network";
       els.adminGateMessage.textContent = "Switch the connected wallet to the configured network to manage the airdrop.";
       els.switchNetworkGateButton.hidden = false;
@@ -1754,7 +1691,6 @@ function applyOwnerGate() {
   }
 
   if (!runtime.owner) {
-      resetAdminAccess();
       els.accountRole.textContent = "Connected wallet";
       els.adminGateMessage.textContent = "Owner address is not available yet. Check the contract config.";
       els.switchNetworkGateButton.hidden = true;
@@ -1764,17 +1700,12 @@ function applyOwnerGate() {
   }
 
   if (!hasOwnershipAccess()) {
-      resetAdminAccess();
       els.accountRole.textContent = "Connected wallet";
       els.adminGateMessage.textContent = "This page only unlocks for the current owner or pending owner address.";
       els.switchNetworkGateButton.hidden = true;
       els.adminShell.hidden = true;
       els.pendingOwnerShell.hidden = true;
       return;
-  }
-
-  if (!isOwner()) {
-    resetAdminAccess();
   }
 
   els.accountRole.textContent = isOwner() ? "Owner connected" : "Pending owner connected";
@@ -1985,17 +1916,9 @@ async function saveDraftRoundLocally() {
   const deadlineUnix = Number(els.startDeadlineUnix.value);
   await validateFutureDeadlineAgainstChain(deadlineUnix);
 
-  const saveChallenge = await requestAirdropSaveChallenge(runtime.config, {
-    walletAddress: runtime.account,
-    merkleRoot: runtime.uploadedRound.root,
-    deadline: deadlineUnix,
-  });
-  const saveSignature = await runtime.signer.signMessage(saveChallenge.message);
   const persisted = await saveAirdropRound(runtime.config, {
     deadline: deadlineUnix,
     walletAddress: runtime.account,
-    challengeId: saveChallenge.challengeId,
-    signature: saveSignature,
     decimals: runtime.tokenDecimals,
     claims: runtime.uploadedRound.claims.map((claim) => ({
       index: claim.index,
@@ -2533,7 +2456,7 @@ function bindEvents() {
       }
 
       const content = await file.text();
-      await callAdminApi((accessToken) => importAdminAccounts(runtime.config, accessToken, {
+      await callLocalAdminData(() => importAdminAccounts(runtime.config, {
         fileName: file.name,
         content,
       }));
@@ -2560,7 +2483,7 @@ function bindEvents() {
     event.preventDefault();
 
     try {
-      const payload = await callAdminApi((accessToken) => saveAdminAccount(runtime.config, accessToken, {
+      const payload = await callLocalAdminData(() => saveAdminAccount(runtime.config, {
         username: els.singleAccountUsernameInput?.value,
         xUserId: els.singleAccountUserIdInput?.value,
         walletAddress: els.singleAccountWalletInput?.value,
@@ -2644,7 +2567,7 @@ function bindEvents() {
       }
 
       const content = await file.text();
-      await callAdminApi((accessToken) => importAdminRecoverySubmissions(runtime.config, accessToken, {
+      await callLocalAdminData(() => importAdminRecoverySubmissions(runtime.config, {
         fileName: file.name,
         content,
       }));

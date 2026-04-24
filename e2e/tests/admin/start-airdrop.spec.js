@@ -35,6 +35,9 @@ test("@smoke admin claims builder can save and deploy a matching airdrop draft",
   await setFutureDeadline(page, "#startDeadlineInput");
   await expect(page.locator("#startDeadlineUnix")).not.toHaveValue("");
 
+  await mockWallet.failNextRequest(page, "personal_sign", {
+    message: "Saving a local round should not request an admin signature.",
+  });
   await page.getByRole("button", { name: "Save Round Locally" }).click();
   await expect(page.locator("#selectedRoundLabel")).toContainText("Draft");
   await page.getByRole("button", { name: "Fund Total" }).first().click();
@@ -80,6 +83,9 @@ test("admin can build a round from every linked wallet with one shared amount", 
   await expect(page.locator("#adminToastMessage")).toHaveText("2 linked wallets loaded; 1 invalid skipped; 1 duplicate skipped.");
 
   await setFutureDeadline(page, "#startDeadlineInput");
+  await mockWallet.failNextRequest(page, "personal_sign", {
+    message: "Saving a local round should not request an admin signature.",
+  });
   await page.getByRole("button", { name: "Save Round Locally" }).click();
   await expect(page.locator("#selectedRoundLabel")).toContainText("Draft");
   await page.getByRole("button", { name: "Fund Total" }).first().click();

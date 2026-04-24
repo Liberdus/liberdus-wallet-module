@@ -369,23 +369,3 @@ export async function deploySavedAirdropRound(config, roundId, payload = {}) {
     round: toRoundResponse(round),
   };
 }
-
-export async function requestAirdropSaveChallenge(config, payload = {}) {
-  const challengeId = `${Date.now()}:${Math.random().toString(16).slice(2)}`;
-  const walletAddress = normalizeAddress(payload.walletAddress) || String(payload.walletAddress || "").trim();
-  const message = [
-    "Save a local Liberdus airdrop round",
-    "",
-    `Wallet: ${walletAddress}`,
-    `Chain ID: ${Number(config?.chainId || 0)}`,
-    `Airdrop: ${normalizeAddress(config?.airdropAddress || "") || ""}`,
-    `Merkle root: ${String(payload.merkleRoot || "").trim()}`,
-    `Deadline: ${Number(payload.deadline || 0)}`,
-    `Challenge: ${challengeId}`,
-  ].join("\n");
-
-  return {
-    challengeId,
-    message,
-  };
-}
