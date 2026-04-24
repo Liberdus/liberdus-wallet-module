@@ -44,6 +44,7 @@ import {
   importAdminRecoverySubmissions,
   exportAdminRecoverySubmissions,
 } from "../shared/admin-data.js";
+import { clearAppLocalStorage } from "../shared/storage.js";
 import { buildClaimRound } from "../shared/merkle.js";
 
 const runtime = {
@@ -120,6 +121,11 @@ const runtime = {
 const els = {
   adminHeader: document.getElementById("adminHeader"),
   refreshButton: document.getElementById("refreshButton"),
+  clearLocalStorageButton: document.getElementById("clearLocalStorageButton"),
+  clearLocalStorageDialog: document.getElementById("clearLocalStorageDialog"),
+  clearLocalStorageDialogPanel: document.getElementById("clearLocalStorageDialogPanel"),
+  cancelClearLocalStorageButton: document.getElementById("cancelClearLocalStorageButton"),
+  confirmClearLocalStorageButton: document.getElementById("confirmClearLocalStorageButton"),
   connectButton: document.getElementById("connectButton"),
   walletMenu: document.getElementById("walletMenu"),
   walletMenuAddress: document.getElementById("walletMenuAddress"),
@@ -301,6 +307,92 @@ function updateToastOffset() {
   if (!els.adminHeader) return;
   const headerHeight = Math.ceil(els.adminHeader.getBoundingClientRect().height);
   document.documentElement.style.setProperty("--claim-toast-top", `${headerHeight + 14}px`);
+}
+
+function createEmptyManagementSummary() {
+  return {
+    accountCount: 0,
+    followerCount: 0,
+    recoveryCandidateCount: 0,
+    latestSnapshotCapturedAt: null,
+    recoverySubmissionCount: 0,
+  };
+}
+
+function createEmptyPagination(pageSize = 50) {
+  return {
+    page: 1,
+    pageSize,
+    total: 0,
+    totalPages: 0,
+    hasNextPage: false,
+    hasPreviousPage: false,
+  };
+}
+
+function isClearLocalStorageDialogOpen() {
+  return Boolean(els.clearLocalStorageDialog && !els.clearLocalStorageDialog.hidden);
+}
+
+function openClearLocalStorageDialog() {
+  if (!els.clearLocalStorageDialog) return;
+  els.clearLocalStorageDialog.hidden = false;
+  document.body.classList.add("confirm-dialog-open");
+  window.requestAnimationFrame(() => {
+    (els.cancelClearLocalStorageButton || els.clearLocalStorageDialogPanel)?.focus();
+  });
+}
+
+function closeClearLocalStorageDialog({ restoreFocus = true } = {}) {
+  if (!els.clearLocalStorageDialog) return;
+  els.clearLocalStorageDialog.hidden = true;
+  document.body.classList.remove("confirm-dialog-open");
+  if (restoreFocus && els.clearLocalStorageButton?.isConnected) {
+    els.clearLocalStorageButton.focus();
+  }
+}
+
+function resetBrowserLocalRuntimeState() {
+  runtime.storedRounds = [];
+  runtime.storedRoundsByEpoch = new Map();
+  runtime.storedRoundsByRoot = new Map();
+  runtime.roundRows = [];
+  runtime.selectedRoundId = null;
+  runtime.selectedRoundClaims = [];
+  runtime.claimLookupRows = [];
+  runtime.uploadedRound = null;
+  runtime.managementSummary = createEmptyManagementSummary();
+  runtime.accountsRows = [];
+  runtime.accountsPagination = createEmptyPagination(Number(els.accountsPageSizeSelect?.value || 50));
+  runtime.accountsSearch = "";
+  runtime.recoverySubmissionRows = [];
+  runtime.recoveryPagination = createEmptyPagination(Number(els.recoveryPageSizeSelect?.value || 50));
+  runtime.recoverySearch = "";
+  runtime.hasLoadedAccountsTab = false;
+
+  if (els.uploadClaimsFileInput) els.uploadClaimsFileInput.value = "";
+  if (els.claimLookupInput) els.claimLookupInput.value = "";
+  if (els.accountsSearchInput) els.accountsSearchInput.value = "";
+  if (els.recoverySearchInput) els.recoverySearchInput.value = "";
+}
+
+async function handleClearLocalStorageConfirmed() {
+  const removedCount = clearAppLocalStorage();
+  closeClearLocalStorageDialog({ restoreFocus: false });
+  resetBrowserLocalRuntimeState();
+  await disconnectWallet(runtime);
+
+  const loaded = await loadUiConfig();
+  runtime.config = loaded.config;
+  runtime.configSource = loaded.source;
+
+  await refreshPage();
+  logger.log(
+    removedCount === 1
+      ? "Cleared 1 wallet module storage item."
+      : `Cleared ${removedCount} wallet module storage items.`,
+    "success",
+  );
 }
 
 function formatHexShort(value) {
@@ -2109,6 +2201,30 @@ function bindEvents() {
     }
   });
 
+  els.clearLocalStorageButton?.addEventListener("click", () => {
+    openClearLocalStorageDialog();
+  });
+
+  els.cancelClearLocalStorageButton?.addEventListener("click", () => {
+    closeClearLocalStorageDialog();
+  });
+
+  els.clearLocalStorageDialog?.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) return;
+    if (target.hasAttribute("data-clear-local-storage-cancel")) {
+      closeClearLocalStorageDialog();
+    }
+  });
+
+  els.confirmClearLocalStorageButton?.addEventListener("click", async () => {
+    try {
+      await handleClearLocalStorageConfirmed();
+    } catch (error) {
+      reportError(error, "Clear local storage");
+    }
+  });
+
   els.refreshRoundClaimsStatusButton?.addEventListener("click", async () => {
     try {
       await refreshSelectedRoundClaimStatuses();
@@ -2675,7 +2791,12 @@ function bindEvents() {
     setWalletMenuOpen(false);
   });
   document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape") setWalletMenuOpen(false);
+    if (event.key !== "Escape") return;
+    if (isClearLocalStorageDialogOpen()) {
+      closeClearLocalStorageDialog();
+      return;
+    }
+    setWalletMenuOpen(false);
   });
 }
 

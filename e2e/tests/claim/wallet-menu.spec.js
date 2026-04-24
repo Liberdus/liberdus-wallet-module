@@ -332,7 +332,7 @@ test.describe("Manual EIP-6963 announcements", () => {
     const restoredWalletNames = [...new Set(requestLog.map((entry) => entry.walletName))];
     expect(restoredWalletNames).toEqual(["MetaMask Secondary"]);
     await expect.poll(async () => page.evaluate(() => {
-      return JSON.parse(window.localStorage.getItem("liberdus-airdrop-wallet-session") || "null")?.walletId || null;
+      return JSON.parse(window.localStorage.getItem("liberdus-wallet-module:wallet-session") || "null")?.walletId || null;
     })).toBe("metamask-secondary-wallet");
   });
 
@@ -448,7 +448,7 @@ test("wallet picker merges Firefox-style Phantom variants into one option", asyn
 
 test("wallet picker shows Phantom as unavailable on BNB Smart Chain", async ({ page }) => {
   await page.addInitScript(() => {
-    const storageKey = "liberdus-airdrop-ui-config";
+    const storageKey = "liberdus-wallet-module:ui-config";
     const current = JSON.parse(window.localStorage.getItem(storageKey) || "{}");
     window.localStorage.setItem(storageKey, JSON.stringify({
       ...current,
@@ -539,7 +539,7 @@ test("wallet picker waits for config before disabling Phantom on BNB Smart Chain
   });
 
   await page.addInitScript(() => {
-    const storageKey = "liberdus-airdrop-ui-config";
+    const storageKey = "liberdus-wallet-module:ui-config";
     const current = JSON.parse(window.localStorage.getItem(storageKey) || "{}");
     window.localStorage.setItem(storageKey, JSON.stringify({
       ...current,
@@ -622,7 +622,7 @@ test("connect button shows a busy state while waiting for wallet config", async 
 
 test("wallet picker does not show a stray MetaMask entry for Firefox-style Phantom provider arrays", async ({ page }) => {
   await page.addInitScript(() => {
-    const storageKey = "liberdus-airdrop-ui-config";
+    const storageKey = "liberdus-wallet-module:ui-config";
     const current = JSON.parse(window.localStorage.getItem(storageKey) || "{}");
     window.localStorage.setItem(storageKey, JSON.stringify({
       ...current,
@@ -755,7 +755,7 @@ test("wallet picker removes a stale legacy entry once a later Phantom match is f
 
 test("stale legacy shim sessions are cleared instead of rebinding to an announced wallet", async ({ page }) => {
   await page.addInitScript(() => {
-    window.localStorage.setItem("liberdus-airdrop-wallet-session", JSON.stringify({ walletId: "legacy:default" }));
+    window.localStorage.setItem("liberdus-wallet-module:wallet-session", JSON.stringify({ walletId: "legacy:default" }));
 
     const icon = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='%2353f3c3'/%3E%3C/svg%3E";
     window.addEventListener("eip6963:requestProvider", () => {
@@ -796,7 +796,7 @@ test("stale legacy shim sessions are cleared instead of rebinding to an announce
 
   await page.goto("index.html");
   await expect(page.getByRole("button", { name: "Connect Wallet" })).toBeVisible();
-  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("liberdus-airdrop-wallet-session"))).toBeNull();
+  await expect.poll(async () => page.evaluate(() => window.localStorage.getItem("liberdus-wallet-module:wallet-session"))).toBeNull();
 
   await page.getByRole("button", { name: "Connect Wallet" }).click();
   await expect(page.getByText("Last used")).toHaveCount(0);

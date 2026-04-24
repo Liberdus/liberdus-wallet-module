@@ -23,6 +23,27 @@
         <button id="adminToastClose" type="button" class="toast-close" aria-label="Dismiss notification">x</button>
       </div>
     </div>
+    <div
+      id="clearLocalStorageDialog"
+      class="confirm-dialog"
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="clearLocalStorageTitle"
+      hidden
+    >
+      <div class="confirm-dialog-backdrop" data-clear-local-storage-cancel aria-hidden="true"></div>
+      <div id="clearLocalStorageDialogPanel" class="confirm-dialog-panel" tabindex="-1">
+        <h2 id="clearLocalStorageTitle">Clear Local Storage?</h2>
+        <p>
+          This removes saved rounds, claim proofs, account rows, recovery imports, wallet session,
+          and local config overrides for this wallet module. Onchain contract state is not changed.
+        </p>
+        <div class="button-row confirm-dialog-actions">
+          <button id="cancelClearLocalStorageButton" type="button" class="ghost">Cancel</button>
+          <button id="confirmClearLocalStorageButton" type="button" class="danger">Clear Local Storage</button>
+        </div>
+      </div>
+    </div>
 
     <header id="adminHeader" class="page-header">
       <div class="page-header-inner">
@@ -119,7 +140,10 @@
               <h2>Admin Workspace</h2>
               <p class="hint">Save rounds in this browser first, then deploy them from the rounds tab when you are ready. Drafts do not reserve an epoch.</p>
             </div>
-            <button id="refreshButton" type="button" class="ghost">Refresh</button>
+            <div class="button-row admin-workspace-actions">
+              <button id="refreshButton" type="button" class="ghost">Refresh</button>
+              <button id="clearLocalStorageButton" type="button" class="danger">Clear Local Storage</button>
+            </div>
           </div>
 
           <div class="detail-list admin-summary-list">

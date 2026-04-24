@@ -2,9 +2,9 @@
 
 This repo is a frontend-only local test harness. It does not use a backend server or database.
 
-The admin page stores round metadata and claim proofs in browser `localStorage`, scoped by the active `deploymentKey` from `frontend/config.local.json` or `frontend/config.json`. The claimant page reads deployed rounds from that same local browser storage and verifies the round against onchain epoch state before showing a claim.
+The admin page stores round metadata and claim proofs in browser `localStorage` under the `liberdus-wallet-module:` namespace, scoped by the active `deploymentKey` from `frontend/config.local.json` or `frontend/config.json`. The claimant page reads deployed rounds from that same local browser storage and verifies the round against onchain epoch state before showing a claim.
 
-Clearing site data removes saved rounds, account rows, and recovery-import test data.
+Clearing site data removes saved rounds, account rows, and recovery-import test data. The admin page also has a `Clear Local Storage` action that removes app-owned local storage keys without changing onchain contract state.
 
 ## 1. Create Claims JSON
 

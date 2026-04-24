@@ -4,6 +4,13 @@ const path = require("node:path");
 const { expect, test } = require("../../fixtures/testWithMockWallet");
 const { connectViaWalletPicker } = require("../helpers");
 
+const UI_STORAGE_KEY = "liberdus-wallet-module:ui-config";
+const WALLET_SESSION_KEY = "liberdus-wallet-module:wallet-session";
+const CLAIMS_STORAGE_KEY = "liberdus-wallet-module:claims:v1";
+const ADMIN_STORAGE_KEY = "liberdus-wallet-module:admin:v1";
+const EXTRA_NAMESPACED_STORAGE_KEY = "liberdus-wallet-module:test-extra";
+const LEGACY_ADMIN_STORAGE_KEY = "liberdus-airdrop-local-admin-v1";
+
 function writeFixtureFile(testInfo, name, content) {
   const filePath = testInfo.outputPath(name);
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
@@ -94,4 +101,44 @@ test("admin can manage accounts and recovery submissions from the accounts tab",
   expect(csvContent).toContain("username_at_submission");
   expect(csvContent).toContain("gamma");
   expect(csvContent).toContain("0xdeadbeef");
+});
+
+test("admin can clear wallet module local storage after confirmation", async ({ page }) => {
+  const keys = [
+    UI_STORAGE_KEY,
+    WALLET_SESSION_KEY,
+    CLAIMS_STORAGE_KEY,
+    ADMIN_STORAGE_KEY,
+    EXTRA_NAMESPACED_STORAGE_KEY,
+    LEGACY_ADMIN_STORAGE_KEY,
+  ];
+
+  await page.goto("admin.html");
+  await connectViaWalletPicker(page);
+  await expect(page.getByText("Owner wallet detected. Admin controls are unlocked.")).toBeVisible();
+
+  await page.evaluate((storageKeys) => {
+    for (const key of storageKeys) {
+      window.localStorage.setItem(key, JSON.stringify({ key }));
+    }
+  }, keys);
+
+  await page.getByRole("button", { name: "Clear Local Storage" }).click();
+  const dialog = page.getByRole("dialog", { name: "Clear Local Storage?" });
+  await expect(dialog).toBeVisible();
+
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(dialog).toBeHidden();
+  await expect.poll(async () => page.evaluate((key) => window.localStorage.getItem(key), ADMIN_STORAGE_KEY))
+    .not.toBeNull();
+
+  await page.getByRole("button", { name: "Clear Local Storage" }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Clear Local Storage" }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.locator("#accountRole")).toHaveText("Disconnected");
+  await expect.poll(async () => page.evaluate((storageKeys) => (
+    storageKeys.map((key) => window.localStorage.getItem(key))
+  ), keys)).toEqual(keys.map(() => null));
 });

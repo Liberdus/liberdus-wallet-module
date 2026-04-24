@@ -1,6 +1,5 @@
 import { normalizeAddress } from "./format.js";
-
-const ADMIN_STORAGE_KEY = "liberdus-airdrop-local-admin-v1";
+import { ADMIN_STORAGE_KEY } from "./constants.js";
 
 function nowIso() {
   return new Date().toISOString();

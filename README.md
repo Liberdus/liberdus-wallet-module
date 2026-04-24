@@ -43,6 +43,15 @@ The admin page can:
 
 The claimant page reads wallet-specific proofs from the same browser storage. Persistence is intentionally lightweight and local to the browser; clearing site data removes saved rounds and admin data.
 
+The app-owned `localStorage` keys are namespaced as:
+
+- `liberdus-wallet-module:ui-config` for browser config overrides
+- `liberdus-wallet-module:wallet-session` for the selected wallet session
+- `liberdus-wallet-module:claims:v1` for saved rounds and claim proofs
+- `liberdus-wallet-module:admin:v1` for account rows and recovery submissions
+
+The admin page includes a `Clear Local Storage` action in the workspace header. After confirmation, it removes those namespaced keys, any other key starting with `liberdus-wallet-module:`, and the old `liberdus-airdrop-*` keys from earlier local builds. Onchain contract state is not changed.
+
 ## Useful Scripts
 
 ```bash

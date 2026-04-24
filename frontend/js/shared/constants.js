@@ -7,8 +7,24 @@ export function toChainIdHex(chainId) {
   return `0x${numericChainId.toString(16)}`;
 }
 
-export const STORAGE_KEY = "liberdus-airdrop-ui-config";
-export const WALLET_SESSION_KEY = "liberdus-airdrop-wallet-session";
+export const APP_STORAGE_NAMESPACE = "liberdus-wallet-module";
+export const APP_STORAGE_PREFIX = `${APP_STORAGE_NAMESPACE}:`;
+export const STORAGE_KEY = `${APP_STORAGE_PREFIX}ui-config`;
+export const WALLET_SESSION_KEY = `${APP_STORAGE_PREFIX}wallet-session`;
+export const CLAIMS_STORAGE_KEY = `${APP_STORAGE_PREFIX}claims:v1`;
+export const ADMIN_STORAGE_KEY = `${APP_STORAGE_PREFIX}admin:v1`;
+export const APP_STORAGE_KEYS = Object.freeze([
+  STORAGE_KEY,
+  WALLET_SESSION_KEY,
+  CLAIMS_STORAGE_KEY,
+  ADMIN_STORAGE_KEY,
+]);
+export const LEGACY_APP_STORAGE_KEYS = Object.freeze([
+  "liberdus-airdrop-ui-config",
+  "liberdus-airdrop-wallet-session",
+  "liberdus-airdrop-local-claims-v1",
+  "liberdus-airdrop-local-admin-v1",
+]);
 export const UI_ROOT = new URL("../../", import.meta.url);
 export const CHAIN_NAME_BY_ID = {
   1: "Ethereum",

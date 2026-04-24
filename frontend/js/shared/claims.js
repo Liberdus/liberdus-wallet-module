@@ -1,7 +1,6 @@
 import { normalizeAddress } from "./format.js";
 import { buildClaimRound } from "./merkle.js";
-
-const CLAIMS_STORAGE_KEY = "liberdus-airdrop-local-claims-v1";
+import { CLAIMS_STORAGE_KEY } from "./constants.js";
 
 function nowIso() {
   return new Date().toISOString();

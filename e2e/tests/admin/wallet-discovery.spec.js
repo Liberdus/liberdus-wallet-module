@@ -5,7 +5,7 @@ test.describe("admin wallet discovery", () => {
 
   test("admin wallet picker shows Phantom as unavailable on BNB Smart Chain", async ({ page }) => {
     await page.addInitScript(() => {
-      const storageKey = "liberdus-airdrop-ui-config";
+      const storageKey = "liberdus-wallet-module:ui-config";
       const current = JSON.parse(window.localStorage.getItem(storageKey) || "{}");
       window.localStorage.setItem(storageKey, JSON.stringify({
         ...current,

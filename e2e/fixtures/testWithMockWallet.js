@@ -8,7 +8,7 @@ const {
 } = require("../helpers/hardhatChain");
 const { writeClaimsFixtureFile } = require("../helpers/generatedClaimsFile");
 
-const STORAGE_KEY = "liberdus-airdrop-ui-config";
+const STORAGE_KEY = "liberdus-wallet-module:ui-config";
 const DEFAULT_UI_CONFIG = {
   apiBaseUrl: "",
   explorerBaseUrl: "https://explorer.local.test",
