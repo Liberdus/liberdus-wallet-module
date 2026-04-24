@@ -43,8 +43,6 @@ The admin page can:
 
 The claimant page reads wallet-specific proofs from the same browser storage. Persistence is intentionally lightweight and local to the browser; clearing site data removes saved rounds and admin data.
 
-X recovery sign-in is disabled by default in this frontend-only fork.
-
 ## Useful Scripts
 
 ```bash

@@ -12,10 +12,6 @@ const STORAGE_KEY = "liberdus-airdrop-ui-config";
 const DEFAULT_UI_CONFIG = {
   apiBaseUrl: "",
   explorerBaseUrl: "https://explorer.local.test",
-  xAuth: {
-    enabled: false,
-    backendUrl: "",
-  },
 };
 
 const MOCK_WALLETS = {
@@ -360,15 +356,6 @@ function installHardhatBackedWalletMock(config) {
     explorerBaseUrl: config.explorerBaseUrl,
     ...existingUiConfig,
   };
-  const existingXAuth = existingUiConfig?.xAuth && typeof existingUiConfig.xAuth === "object"
-    ? existingUiConfig.xAuth
-    : {};
-  if (config.xAuth || Object.keys(existingXAuth).length) {
-    mergedUiConfig.xAuth = {
-      ...(config.xAuth || {}),
-      ...existingXAuth,
-    };
-  }
 
   localStorage.setItem(config.storageKey, JSON.stringify(mergedUiConfig));
 
@@ -413,10 +400,6 @@ const test = base.extend({
       storageKey: STORAGE_KEY,
       apiBaseUrl: "",
       explorerBaseUrl: "https://explorer.local.test",
-      xAuth: {
-        enabled: false,
-        backendUrl: "",
-      },
     });
 
     await use(context);

@@ -31,8 +31,6 @@ export async function loadUiConfig() {
 
   const savedOverrides = window.localStorage.getItem(STORAGE_KEY);
   const overrides = savedOverrides ? JSON.parse(savedOverrides) : {};
-  const loadedXAuth = loaded?.xAuth && typeof loaded.xAuth === "object" ? loaded.xAuth : {};
-  const overrideXAuth = overrides?.xAuth && typeof overrides.xAuth === "object" ? overrides.xAuth : {};
   const hasOverrideExplorerBaseUrl = Object.prototype.hasOwnProperty.call(overrides, "explorerBaseUrl");
 
   const config = {
@@ -54,15 +52,6 @@ export async function loadUiConfig() {
         ? overrides.explorerBaseUrl
         : (loaded.explorerBaseUrl || "")
     ).trim(),
-    xAuth: {
-      enabled: overrideXAuth.enabled ?? loadedXAuth.enabled ?? false,
-      redirectUri: String(overrideXAuth.redirectUri || loadedXAuth.redirectUri || loaded.xRedirectUri || "").trim(),
-      backendUrl: String(
-        overrideXAuth.backendUrl
-        || loadedXAuth.backendUrl
-        || ""
-      ).trim(),
-    },
   };
 
   config.chainId = Number(config.chainId);

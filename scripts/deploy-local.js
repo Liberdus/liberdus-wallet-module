@@ -56,11 +56,6 @@ async function main() {
     airdropAddress: await airdrop.getAddress(),
     apiBaseUrl: "",
     deploymentKey: `local:${crypto.randomUUID()}`,
-    xAuth: {
-      enabled: false,
-      redirectUri: "",
-      backendUrl: "",
-    },
     generatedAt: new Date().toISOString(),
   };
 
