@@ -59,10 +59,18 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     selectedWalletName: null,
     selectedWalletRdns: null,
     sessionWalletId: null,
+    injectedProvider: null,
+    providerSource: null,
     isConnecting: false,
   };
 
   let discoveryUnsubscribe = null;
+
+  function updateInjectedProviderState() {
+    const provider = discovery.getInjectedProvider();
+    state.injectedProvider = provider;
+    state.providerSource = provider;
+  }
 
   function saveWalletSession(walletId) {
     if (!isStorageUsable(storage)) return;
@@ -154,6 +162,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     state.isConnecting = true;
     try {
       discovery.applyActiveWallet(wallet);
+      updateInjectedProviderState();
       await initializeDiscoveryEvents();
 
       const provider = discovery.getInjectedProvider();
@@ -198,6 +207,8 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     state.selectedWalletName = null;
     state.selectedWalletRdns = null;
     state.sessionWalletId = null;
+    state.injectedProvider = null;
+    state.providerSource = null;
     state.isConnecting = false;
     discovery.applyActiveWallet(null);
     emitEvent("disconnected", null);
@@ -221,6 +232,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     }
 
     discovery.applyActiveWallet(selectedWallet);
+    updateInjectedProviderState();
     state.selectedWalletId = selectedWallet?.id || null;
     state.selectedWalletName = selectedWallet?.info?.name || null;
     state.selectedWalletRdns = selectedWallet?.info?.rdns || null;

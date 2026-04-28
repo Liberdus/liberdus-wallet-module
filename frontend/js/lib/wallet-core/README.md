@@ -34,6 +34,7 @@ This repo uses `frontend/js/shared/wallet.js` as a bridge adapter that:
 
 - creates an ethers provider from the raw injected provider
 - maps core state into the app `runtime`
+- discovers wallets before rendering wallet selection so UI prompts have a current wallet list
 - keeps network switching and contract wiring in app code
 
 ## Notes

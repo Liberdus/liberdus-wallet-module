@@ -8,11 +8,13 @@ const walletCore = createWalletCore({
 
 function syncRuntimeWithCore(runtime) {
   const state = walletCore.getState();
+  const injected = walletCore.getEip1193Provider();
+
   runtime.account = state.account;
   runtime.chainId = state.chainId;
   runtime.chainName = state.chainName;
-  runtime.injectedProvider = state.injectedProvider;
-  runtime.providerSource = state.providerSource;
+  runtime.injectedProvider = injected;
+  runtime.providerSource = injected;
   runtime.selectedWalletId = state.selectedWalletId;
   runtime.selectedWalletName = state.selectedWalletName;
   runtime.selectedWalletRdns = state.selectedWalletRdns;
@@ -145,6 +147,7 @@ export function hasWalletSession() {
 }
 
 export async function getAvailableWallets(config = null) {
+  await walletCore.discoverWallets();
   return walletCore.getAvailableWallets(config);
 }
 
