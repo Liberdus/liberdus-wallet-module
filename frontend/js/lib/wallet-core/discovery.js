@@ -498,10 +498,8 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
 
   async function resolveWalletById(walletId) {
     if (!walletId) return null;
-    const cachedWallet = findWalletById(walletId);
-    if (cachedWallet) return cachedWallet;
-    const wallets = await discoverWallets();
-    return wallets.find((wallet) => wallet.id === resolveWalletAlias(walletId)) || null;
+    await discoverWallets();
+    return findWalletById(walletId);
   }
 
   function getAvailableWallets(config = null) {
