@@ -7,6 +7,80 @@ const walletCore = createWalletCore({
   walletSessionKey: WALLET_SESSION_KEY,
 });
 
+function normalizeWalletIdentityValue(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function isBnbChainConfig(config) {
+  const chainId = Number(config?.chainId);
+  return chainId === 56 || chainId === 97;
+}
+
+function getConfiguredNetworkLabel(config) {
+  return String(config?.networkName || "").trim() || "the configured network";
+}
+
+function isPhantomWallet(wallet) {
+  if (!wallet) return false;
+
+  const name = normalizeWalletIdentityValue(wallet.info?.name);
+  const rdns = normalizeWalletIdentityValue(wallet.info?.rdns);
+  return name.includes("phantom")
+    || rdns.includes("phantom")
+    || Boolean(wallet.provider?.isPhantom);
+}
+
+function getWalletCompatibility(config, wallet) {
+  if (!wallet) {
+    return {
+      isSupported: true,
+      isDisabled: false,
+      disabledReason: "",
+      errorMessage: "",
+    };
+  }
+
+  if (isBnbChainConfig(config) && isPhantomWallet(wallet)) {
+    const networkLabel = getConfiguredNetworkLabel(config);
+    const walletName = wallet.info?.name || "This wallet";
+    return {
+      isSupported: false,
+      isDisabled: true,
+      disabledReason: `Doesn't support ${networkLabel}.`,
+      errorMessage: `${walletName} does not support ${networkLabel}.`,
+    };
+  }
+
+  return {
+    isSupported: true,
+    isDisabled: false,
+    disabledReason: "",
+    errorMessage: "",
+  };
+}
+
+function assertWalletSupported(config, wallet) {
+  const compatibility = getWalletCompatibility(config, wallet);
+  if (!compatibility.isSupported) {
+    throw new Error(compatibility.errorMessage);
+  }
+
+  return compatibility;
+}
+
+async function enforceSelectedWalletPolicy(runtime) {
+  const state = walletCore.getState();
+  if (!state.selectedWalletId) return true;
+
+  const selectedWallet = await walletCore.resolveWalletById(state.selectedWalletId);
+  const compatibility = getWalletCompatibility(runtime.config, selectedWallet);
+  if (compatibility.isSupported) return true;
+
+  await walletCore.disconnect();
+  syncRuntimeWithCore(runtime);
+  return false;
+}
+
 function syncRuntimeWithCore(runtime) {
   const state = walletCore.getState();
   const injected = walletCore.getEip1193Provider();
@@ -51,7 +125,14 @@ export async function ensureProvider(runtime) {
 }
 
 export async function connectWallet(runtime, walletId) {
-  const account = await walletCore.connect({ walletId, config: runtime.config });
+  const wallet = await walletCore.resolveWalletById(walletId);
+  if (!wallet) {
+    throw new Error("The selected wallet is no longer available. Refresh the page and try again.");
+  }
+
+  assertWalletSupported(runtime.config, wallet);
+
+  const account = await walletCore.connect({ walletId });
   syncRuntimeWithCore(runtime);
   runtime.provider = await ensureProvider(runtime);
   runtime.signer = await runtime.provider.getSigner();
@@ -78,8 +159,12 @@ export async function disconnectWallet(runtime) {
 }
 
 export async function syncWalletState(runtime) {
-  await walletCore.sync(runtime.config);
+  await walletCore.sync();
   syncRuntimeWithCore(runtime);
+
+  if (!await enforceSelectedWalletPolicy(runtime)) {
+    return;
+  }
 
   if (!runtime.account) {
     runtime.signer = null;
@@ -154,7 +239,14 @@ export function hasWalletSession() {
 
 export async function getAvailableWallets(config = null) {
   await walletCore.discoverWallets();
-  return walletCore.getAvailableWallets(config);
+  return walletCore.getAvailableWallets().map((wallet) => {
+    const compatibility = getWalletCompatibility(config, wallet);
+    return {
+      ...wallet,
+      isDisabled: compatibility.isDisabled,
+      disabledReason: compatibility.disabledReason,
+    };
+  });
 }
 
 export function bindWalletEvents({ onAccountsChanged, onChainChanged }) {
