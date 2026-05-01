@@ -11,11 +11,16 @@ function syncRuntimeWithCore(runtime) {
   const state = walletCore.getState();
   const injected = walletCore.getEip1193Provider();
 
+  if (runtime.providerSource !== injected) {
+    runtime.provider = null;
+    runtime.providerSource = null;
+    runtime.signer = null;
+  }
+
   runtime.account = state.account;
   runtime.chainId = state.chainId;
   runtime.chainName = resolveChainName(state.chainId, state.chainName, runtime.config);
   runtime.injectedProvider = injected;
-  runtime.providerSource = injected;
   runtime.selectedWalletId = state.selectedWalletId;
   runtime.selectedWalletName = state.selectedWalletName;
   runtime.selectedWalletRdns = state.selectedWalletRdns;
