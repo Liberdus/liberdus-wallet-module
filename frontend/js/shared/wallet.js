@@ -1,9 +1,10 @@
 import { createWalletCore } from "../lib/wallet-core/index.js";
 import { createBrowserProvider } from "../lib/wallet-core/adapters/ethers.js";
-import { CHAIN_NAME_BY_ID, toChainIdHex } from "./constants.js";
+import { CHAIN_NAME_BY_ID, WALLET_SESSION_KEY, toChainIdHex } from "./constants.js";
 
 const walletCore = createWalletCore({
   storage: typeof window !== "undefined" ? window.localStorage : null,
+  walletSessionKey: WALLET_SESSION_KEY,
 });
 
 function syncRuntimeWithCore(runtime) {
@@ -12,7 +13,7 @@ function syncRuntimeWithCore(runtime) {
 
   runtime.account = state.account;
   runtime.chainId = state.chainId;
-  runtime.chainName = state.chainName;
+  runtime.chainName = resolveChainName(state.chainId, state.chainName, runtime.config);
   runtime.injectedProvider = injected;
   runtime.providerSource = injected;
   runtime.selectedWalletId = state.selectedWalletId;
@@ -62,7 +63,7 @@ export async function disconnectWallet(runtime) {
     const provider = await ensureProvider(runtime);
     const network = await provider.getNetwork();
     runtime.chainId = Number(network.chainId);
-    runtime.chainName = network.name || runtime.chainName;
+    runtime.chainName = resolveChainName(runtime.chainId, network.name, runtime.config);
   } catch {
     runtime.chainId = null;
     runtime.chainName = null;

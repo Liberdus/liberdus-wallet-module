@@ -21,8 +21,27 @@ function normalizeWalletInfo(info = {}) {
   };
 }
 
+function matchesWalletNamespaceProvider(namespaceProvider, provider) {
+  if (!namespaceProvider || !provider) return false;
+  if (namespaceProvider === provider) return true;
+
+  const namespaceProviders = Array.isArray(namespaceProvider.providers)
+    ? namespaceProvider.providers
+    : [];
+  const candidateProviders = Array.isArray(provider.providers)
+    ? provider.providers
+    : [];
+
+  return namespaceProviders.includes(provider) || candidateProviders.includes(namespaceProvider);
+}
+
+function isPhantomNamespaceProvider(provider) {
+  if (typeof window === "undefined") return false;
+  return matchesWalletNamespaceProvider(window.phantom?.ethereum, provider);
+}
+
 function guessLegacyWalletName(provider) {
-  if (provider?.isPhantom || (typeof window !== "undefined" && window.phantom?.ethereum === provider)) return "Phantom";
+  if (provider?.isPhantom || isPhantomNamespaceProvider(provider)) return "Phantom";
   if (provider?.isRabby) return "Rabby";
   if (provider?.isCoinbaseWallet) return "Coinbase Wallet";
   if (provider?.isBraveWallet) return "Brave Wallet";
@@ -33,7 +52,7 @@ function guessLegacyWalletName(provider) {
 }
 
 function guessLegacyWalletRdns(provider) {
-  if (provider?.isPhantom || (typeof window !== "undefined" && window.phantom?.ethereum === provider)) return "com.phantom.browser";
+  if (provider?.isPhantom || isPhantomNamespaceProvider(provider)) return "com.phantom.browser";
   if (provider?.isRabby) return "io.rabby";
   if (provider?.isCoinbaseWallet) return "com.coinbase.wallet";
   if (provider?.isBraveWallet) return "com.brave.wallet";
@@ -69,7 +88,7 @@ function isPhantomWallet(wallet) {
   return name.includes("phantom")
     || rdns.includes("phantom")
     || Boolean(wallet.provider?.isPhantom)
-    || (typeof window !== "undefined" && window.phantom?.ethereum === wallet.provider);
+    || isPhantomNamespaceProvider(wallet.provider);
 }
 
 function getWalletCompatibility(config, wallet) {
@@ -253,6 +272,33 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     return null;
   }
 
+  function hasDiscoveredEip6963Wallets() {
+    return [...discoveredWallets.values()].some((wallet) => wallet.source === "eip6963");
+  }
+
+  function pruneLegacyShimWallets(latestWallet) {
+    if (!latestWallet || typeof window === "undefined") return false;
+
+    const ethereum = window.ethereum;
+    if (!ethereum || Array.isArray(ethereum.providers)) return false;
+
+    let changed = false;
+    for (const wallet of [...discoveredWallets.values()]) {
+      if (wallet.id === latestWallet.id) continue;
+      if (wallet.source !== LEGACY_WALLET_PREFIX) continue;
+      if (wallet.provider !== ethereum) continue;
+
+      discoveredWallets.delete(wallet.id);
+      changed = true;
+    }
+
+    if (changed) {
+      rebuildWalletLookups();
+    }
+
+    return changed;
+  }
+
   function syncWalletEventProvider() {
     const nextProvider = walletEventSubscribers.size ? activeInjectedProvider || getReadOnlyInjectedProvider() : null;
 
@@ -371,7 +417,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
         .filter(Boolean);
     }
 
-    if ([...discoveredWallets.values()].some((wallet) => wallet.source === "eip6963")) {
+    if (hasDiscoveredEip6963Wallets()) {
       return [];
     }
 
@@ -404,13 +450,17 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       const detail = event?.detail;
       if (!detail?.provider) return;
 
-      registerWallet({
+      const wallet = registerWallet({
         id: detail.info?.uuid || detail.info?.rdns || createWalletId("eip6963", detail.info?.name, "wallet"),
         provider: detail.provider,
         source: "eip6963",
         sortIndex: nextEip6963SortIndex++,
         info: detail.info || {},
       });
+
+      if (pruneLegacyShimWallets(wallet)) {
+        syncWalletEventProvider();
+      }
     });
 
     collectLegacyWallets();

@@ -32,6 +32,9 @@ function normalizeAddress(address) {
 function normalizeWalletSession(rawSession) {
   if (!rawSession) return null;
   if (typeof rawSession !== "string") return null;
+  if (rawSession === "injected") {
+    return { walletId: "legacy:default" };
+  }
   if (rawSession.trim().startsWith("{")) {
     try {
       const parsed = JSON.parse(rawSession);
@@ -124,7 +127,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
       const nextChainId = parseChainId(data);
       state.chainId = nextChainId;
       state.chainName = resolveChainName(nextChainId, null);
-      emitEvent("chainChanged", nextChainId);
+      emitEvent("chainChanged", data);
       return;
     }
 
