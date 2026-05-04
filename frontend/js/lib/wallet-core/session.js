@@ -1,5 +1,3 @@
-import { assertWalletSupported } from "./discovery.js";
-
 function parseChainId(rawChainId) {
   if (typeof rawChainId === "number" && Number.isFinite(rawChainId)) {
     return Number(rawChainId);
@@ -154,13 +152,11 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     return Boolean(getWalletSession()?.walletId);
   }
 
-  async function connect({ walletId, config = null } = {}) {
+  async function connect({ walletId } = {}) {
     const wallet = await discovery.resolveWalletById(walletId);
     if (!wallet) {
       throw new Error("The selected wallet is no longer available. Refresh the page and try again.");
     }
-
-    assertWalletSupported(config, wallet);
 
     state.isConnecting = true;
     try {
@@ -217,18 +213,10 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     emitEvent("disconnected", null);
   }
 
-  async function sync(config = null) {
+  async function sync() {
     await initializeDiscoveryEvents();
     const session = getWalletSession();
-    let selectedWallet = session?.walletId ? await discovery.resolveWalletById(session.walletId) : null;
-
-    if (selectedWallet) {
-      try {
-        assertWalletSupported(config, selectedWallet);
-      } catch {
-        selectedWallet = null;
-      }
-    }
+    const selectedWallet = session?.walletId ? await discovery.resolveWalletById(session.walletId) : null;
 
     if (session?.walletId && !selectedWallet) {
       clearWalletSession();

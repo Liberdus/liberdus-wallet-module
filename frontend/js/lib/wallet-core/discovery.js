@@ -71,64 +71,6 @@ function mergeWalletInfo(primary = {}, secondary = {}) {
   };
 }
 
-function isBnbChainConfig(config) {
-  const chainId = Number(config?.chainId);
-  return chainId === 56 || chainId === 97;
-}
-
-function getConfiguredNetworkLabel(config) {
-  return String(config?.networkName || "").trim() || "the configured network";
-}
-
-function isPhantomWallet(wallet) {
-  if (!wallet) return false;
-
-  const name = normalizeWalletIdentityValue(wallet.info?.name);
-  const rdns = normalizeWalletIdentityValue(wallet.info?.rdns);
-  return name.includes("phantom")
-    || rdns.includes("phantom")
-    || Boolean(wallet.provider?.isPhantom)
-    || isPhantomNamespaceProvider(wallet.provider);
-}
-
-function getWalletCompatibility(config, wallet) {
-  if (!wallet) {
-    return {
-      isSupported: true,
-      isDisabled: false,
-      disabledReason: "",
-      errorMessage: "",
-    };
-  }
-
-  if (isBnbChainConfig(config) && isPhantomWallet(wallet)) {
-    const networkLabel = getConfiguredNetworkLabel(config);
-    const walletName = wallet.info?.name || "This wallet";
-    return {
-      isSupported: false,
-      isDisabled: true,
-      disabledReason: `Doesn't support ${networkLabel}.`,
-      errorMessage: `${walletName} does not support ${networkLabel}.`,
-    };
-  }
-
-  return {
-    isSupported: true,
-    isDisabled: false,
-    disabledReason: "",
-    errorMessage: "",
-  };
-}
-
-export function assertWalletSupported(config, wallet) {
-  const compatibility = getWalletCompatibility(config, wallet);
-  if (!compatibility.isSupported) {
-    throw new Error(compatibility.errorMessage);
-  }
-
-  return compatibility;
-}
-
 function mergeLinkedProviders(...providers) {
   return [...new Set(providers.filter(Boolean))];
 }
@@ -502,17 +444,12 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     return findWalletById(walletId);
   }
 
-  function getAvailableWallets(config = null) {
-    return listWalletsSnapshot().map((wallet) => {
-      const compatibility = getWalletCompatibility(config, wallet);
-      return {
-        id: wallet.id,
-        source: wallet.source,
-        info: { ...wallet.info },
-        isDisabled: compatibility.isDisabled,
-        disabledReason: compatibility.disabledReason,
-      };
-    });
+  function getAvailableWallets() {
+    return listWalletsSnapshot().map((wallet) => ({
+      id: wallet.id,
+      source: wallet.source,
+      info: { ...wallet.info },
+    }));
   }
 
   return {
