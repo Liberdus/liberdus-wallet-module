@@ -1,5 +1,5 @@
-import { createWalletDiscovery } from "./discovery.js";
-import { createWalletSession } from "./session.js";
+import { createWalletDiscovery } from "./core/discovery.js";
+import { createWalletSession } from "./core/session.js";
 
 export const DEFAULT_WALLET_SESSION_KEY = "liberdus-wallet-module:walletSession";
 

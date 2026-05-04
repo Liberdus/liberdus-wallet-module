@@ -2,6 +2,19 @@
 
 This folder contains a neutral injected wallet discovery and session core intended for reuse across browser ESM apps.
 
+## Folder shape
+
+```text
+wallet-core/
+  index.js              Public core factory
+  core/                 Neutral discovery and session implementation
+  adapters/             Optional app/client-library adapters
+  discovery.js          Compatibility re-export
+  session.js            Compatibility re-export
+```
+
+Apps should import the public factory from `index.js`. The `core/` files are kept UI-free and app-policy-free so they can later move into a shared repository with minimal logic changes.
+
 ## What it provides
 
 - injected wallet discovery via EIP-6963 and legacy `window.ethereum`
@@ -44,3 +57,4 @@ This repo uses `frontend/js/shared/wallet.js` as a bridge adapter that:
 - Ethers-specific provider creation belongs in an adapter.
 - Wallet compatibility and network policy belong in the app adapter, not the neutral core.
 - The core is browser-first and expects a browser-compatible storage object.
+- Root `discovery.js` and `session.js` are compatibility re-exports; new integrations should prefer `index.js`.
