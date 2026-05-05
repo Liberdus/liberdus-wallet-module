@@ -16,6 +16,7 @@ wallet-core/
 
 Apps should import the public factory from `index.js`. The `core/` files are kept UI-free and app-policy-free so they can later move into a shared repository with minimal logic changes.
 Use `npm run wallet-core:export` from the repo root to generate an export-ready copy under `dist/wallet-core/`.
+Use `npm run wallet-core:vendor` to refresh the Phase 8.5 served vendor copy.
 
 ## What it provides
 

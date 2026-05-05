@@ -1,4 +1,4 @@
-export { toChainIdHex } from "../lib/wallet-core/adapters/chain.js";
+export { toChainIdHex } from "../../vendor/liberdus-wallet-core/adapters/chain.js";
 
 export const APP_STORAGE_NAMESPACE = "liberdus-wallet-module";
 export const APP_STORAGE_PREFIX = `${APP_STORAGE_NAMESPACE}:`;

@@ -21,6 +21,7 @@
     "serve": "node scripts/e2e/static-server.js",
     "serve:e2e": "node scripts/e2e/static-server.js",
     "wallet-core:export": "node scripts/export-wallet-core.js",
+    "wallet-core:vendor": "node scripts/export-wallet-core.js --out frontend/vendor/liberdus-wallet-core",
     "merkle": "node scripts/generate-merkle.js"
   },
   "devDependencies": {
