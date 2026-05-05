@@ -9,6 +9,7 @@ coverage/
 npm-debug.log*
 frontend/config.local.json
 frontend/config.json
+frontend/demo-claim.local.json
 frontend/claims/generated/
 playwright-report/
 test-results/

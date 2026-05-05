@@ -70,6 +70,19 @@ Keep these outside the neutral core:
 - app-specific storage names
 - app-specific compatibility rules, such as disabling a wallet for a target network
 
+## This Repo's Adapter
+
+The claim/admin pages consume `frontend/js/shared/wallet-adapter.js` directly so the app
+adapter boundary is visible in the integration. `frontend/js/shared/wallet.js` remains as
+a compatibility facade for older imports and re-exports the same adapter API.
+
+`wallet-adapter.js` is the repo-local boundary that:
+
+- creates ethers providers from the active EIP-1193 wallet provider
+- maps neutral core state into the claim/admin `runtime`
+- applies configured-network compatibility rules
+- owns wallet network add/switch prompts
+
 ## Compatibility Files
 
 Root `discovery.js` and `session.js` currently re-export the neutral `core/` modules for transition safety. New integrations should use `index.js` unless they are intentionally testing internals.

@@ -5,6 +5,7 @@ const path = require("node:path");
 const HOST = "127.0.0.1";
 const PORT = Number(process.env.PORT || 4173);
 const ROOT_DIR = path.resolve(__dirname, "..", "..");
+const FRONTEND_DIR = path.join(ROOT_DIR, "frontend");
 
 const MIME_TYPES = {
   ".css": "text/css; charset=utf-8",
@@ -37,6 +38,23 @@ function resolveFilePath(urlPathname) {
 
   if (fs.existsSync(candidatePath) && fs.statSync(candidatePath).isDirectory()) {
     return path.join(candidatePath, "index.html");
+  }
+
+  if (fs.existsSync(candidatePath)) {
+    return candidatePath;
+  }
+
+  const frontendCandidatePath = path.resolve(FRONTEND_DIR, `.${normalizedPath}`);
+  if (!frontendCandidatePath.startsWith(FRONTEND_DIR)) {
+    return null;
+  }
+
+  if (fs.existsSync(frontendCandidatePath) && fs.statSync(frontendCandidatePath).isDirectory()) {
+    return path.join(frontendCandidatePath, "index.html");
+  }
+
+  if (fs.existsSync(frontendCandidatePath)) {
+    return frontendCandidatePath;
   }
 
   return candidatePath;
