@@ -57,6 +57,13 @@ const eip1193Provider = walletCore.getEip1193Provider();
 
 Wrap this provider in the consuming app or an adapter. For this repo, `frontend/js/lib/wallet-core/adapters/ethers.js` creates an ethers v6 `BrowserProvider`.
 
+## Optional Chain Helper
+
+`frontend/js/lib/wallet-core/adapters/chain.js` exposes low-level helpers for
+`wallet_switchEthereumChain`, `wallet_addEthereumChain`, and chain ID hex formatting.
+These helpers do not decide when switching is appropriate. The consuming app remains
+responsible for required-chain checks, mismatch handling, and write-time network policy.
+
 ## App Responsibilities
 
 Keep these outside the neutral core:

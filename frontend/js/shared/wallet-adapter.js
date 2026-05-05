@@ -1,6 +1,7 @@
 import { createWalletCore } from "../lib/wallet-core/index.js";
+import { addEthereumChain, switchOrAddEthereumChain } from "../lib/wallet-core/adapters/chain.js";
 import { createBrowserProvider } from "../lib/wallet-core/adapters/ethers.js";
-import { CHAIN_NAME_BY_ID, WALLET_SESSION_KEY, toChainIdHex } from "./constants.js";
+import { CHAIN_NAME_BY_ID, WALLET_SESSION_KEY } from "./constants.js";
 
 const walletCore = createWalletCore({
   storage: typeof window !== "undefined" ? window.localStorage : null,
@@ -195,18 +196,11 @@ export async function addConfiguredNetwork(config) {
     throw new Error("Configured networkName, rpcUrl, and nativeCurrency are required.");
   }
 
-  const chainIdHex = toChainIdHex(config.chainId);
-
-  await injected.request({
-    method: "wallet_addEthereumChain",
-    params: [
-      {
-        chainId: chainIdHex,
-        chainName: config.networkName,
-        rpcUrls: [config.rpcUrl],
-        nativeCurrency: config.nativeCurrency,
-      },
-    ],
+  await addEthereumChain(injected, {
+    chainId: config.chainId,
+    chainName: config.networkName,
+    rpcUrl: config.rpcUrl,
+    nativeCurrency: config.nativeCurrency,
   });
 }
 
@@ -215,22 +209,12 @@ export async function switchConfiguredNetwork(config) {
   if (!injected) throw new Error("No compatible wallet was detected.");
   if (!Number.isInteger(Number(config.chainId))) throw new Error("Configured chainId is required.");
 
-  const chainIdHex = toChainIdHex(config.chainId);
-
-  try {
-    await injected.request({
-      method: "wallet_switchEthereumChain",
-      params: [{ chainId: chainIdHex }],
-    });
-  } catch (error) {
-    if (error?.code === 4902) {
-      await addConfiguredNetwork(config);
-      await switchConfiguredNetwork(config);
-      return;
-    }
-
-    throw error;
-  }
+  await switchOrAddEthereumChain(injected, {
+    chainId: config.chainId,
+    chainName: config.networkName,
+    rpcUrl: config.rpcUrl,
+    nativeCurrency: config.nativeCurrency,
+  });
 }
 
 export function hasWalletSession() {

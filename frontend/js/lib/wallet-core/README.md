@@ -58,6 +58,7 @@ The app adapter:
 
 - The core does not depend on ethers.
 - Ethers-specific provider creation belongs in an adapter.
+- Low-level chain add/switch RPC helpers live in `adapters/chain.js`, but apps decide when to call them.
 - Wallet compatibility and network policy belong in the app adapter, not the neutral core.
 - The core is browser-first and expects a browser-compatible storage object.
 - Root `discovery.js` and `session.js` are compatibility re-exports; new integrations should prefer `index.js`.

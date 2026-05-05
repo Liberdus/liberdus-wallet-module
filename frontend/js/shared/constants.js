@@ -1,11 +1,4 @@
-export function toChainIdHex(chainId) {
-  const numericChainId = Number(chainId);
-  if (!Number.isInteger(numericChainId) || numericChainId < 0) {
-    throw new Error("chainId must be a non-negative integer.");
-  }
-
-  return `0x${numericChainId.toString(16)}`;
-}
+export { toChainIdHex } from "../lib/wallet-core/adapters/chain.js";
 
 export const APP_STORAGE_NAMESPACE = "liberdus-wallet-module";
 export const APP_STORAGE_PREFIX = `${APP_STORAGE_NAMESPACE}:`;
