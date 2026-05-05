@@ -44,7 +44,8 @@ await walletCore.connect({ walletId: wallets[0].id });
 
 Apps should keep UI and network policy separate from the core.
 This repo uses `frontend/js/shared/wallet-adapter.js` as the claim/admin app adapter.
-`frontend/js/shared/wallet.js` remains a compatibility facade for existing page imports.
+Claim/admin pages import this adapter directly. `frontend/js/shared/wallet.js` remains a
+compatibility facade for older imports.
 The app adapter:
 
 - creates an ethers provider from the raw injected provider

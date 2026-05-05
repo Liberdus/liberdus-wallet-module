@@ -72,9 +72,9 @@ Keep these outside the neutral core:
 
 ## This Repo's Adapter
 
-The claim/admin pages consume `frontend/js/shared/wallet.js` for compatibility with the
-existing app API. That file re-exports the app facade from
-`frontend/js/shared/wallet-adapter.js`.
+The claim/admin pages consume `frontend/js/shared/wallet-adapter.js` directly so the app
+adapter boundary is visible in the integration. `frontend/js/shared/wallet.js` remains as
+a compatibility facade for older imports and re-exports the same adapter API.
 
 `wallet-adapter.js` is the repo-local boundary that:
 

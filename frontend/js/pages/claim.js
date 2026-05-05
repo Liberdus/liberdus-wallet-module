@@ -20,7 +20,7 @@ import {
   switchConfiguredNetwork,
   bindWalletEvents,
   getAvailableWallets,
-} from "../shared/wallet.js";
+} from "../shared/wallet-adapter.js";
 import { promptForWalletSelection } from "../shared/wallet-picker.js";
 import { fetchWalletClaimRounds, isClaimsApiConfigured } from "../shared/claims.js";
 
