@@ -4,6 +4,7 @@ cache/
 data/
 backups/
 coverage/
+dist/
 .vscode/
 .env
 npm-debug.log*

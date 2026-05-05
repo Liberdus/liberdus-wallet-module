@@ -2,6 +2,7 @@ import { createWalletCore } from "../lib/wallet-core/index.js";
 import { addEthereumChain, switchOrAddEthereumChain } from "../lib/wallet-core/adapters/chain.js";
 import { createBrowserProvider } from "../lib/wallet-core/adapters/ethers.js";
 import { CHAIN_NAME_BY_ID, WALLET_SESSION_KEY } from "./constants.js";
+import { ethers } from "./ethers.js";
 
 const walletCore = createWalletCore({
   storage: typeof window !== "undefined" ? window.localStorage : null,
@@ -118,7 +119,7 @@ export async function ensureProvider(runtime) {
   if (!injected) throw new Error("No compatible wallet was detected in this browser.");
 
   if (!runtime.provider || runtime.providerSource !== injected) {
-    runtime.provider = createBrowserProvider(injected);
+    runtime.provider = createBrowserProvider(injected, ethers);
     runtime.providerSource = injected;
   }
 

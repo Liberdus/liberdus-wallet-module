@@ -20,6 +20,7 @@
     "fund:owner:local": "hardhat fund-owner-wallet --network localhost",
     "serve": "node scripts/e2e/static-server.js",
     "serve:e2e": "node scripts/e2e/static-server.js",
+    "wallet-core:export": "node scripts/export-wallet-core.js",
     "merkle": "node scripts/generate-merkle.js"
   },
   "devDependencies": {

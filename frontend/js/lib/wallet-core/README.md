@@ -11,9 +11,11 @@ wallet-core/
   adapters/             Optional app/client-library adapters
   discovery.js          Compatibility re-export
   session.js            Compatibility re-export
+  EXPORT_MANIFEST.json  Files and boundaries for future repo extraction
 ```
 
 Apps should import the public factory from `index.js`. The `core/` files are kept UI-free and app-policy-free so they can later move into a shared repository with minimal logic changes.
+Use `npm run wallet-core:export` from the repo root to generate an export-ready copy under `dist/wallet-core/`.
 
 ## What it provides
 
@@ -57,7 +59,7 @@ The app adapter:
 ## Notes
 
 - The core does not depend on ethers.
-- Ethers-specific provider creation belongs in an adapter.
+- Ethers-specific provider creation belongs in an adapter and receives ethers from the consuming app.
 - Low-level chain add/switch RPC helpers live in `adapters/chain.js`, but apps decide when to call them.
 - Wallet compatibility and network policy belong in the app adapter, not the neutral core.
 - The core is browser-first and expects a browser-compatible storage object.

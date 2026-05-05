@@ -55,7 +55,7 @@ The core exposes the active raw EIP-1193 provider:
 const eip1193Provider = walletCore.getEip1193Provider();
 ```
 
-Wrap this provider in the consuming app or an adapter. For this repo, `frontend/js/lib/wallet-core/adapters/ethers.js` creates an ethers v6 `BrowserProvider`.
+Wrap this provider in the consuming app or an adapter. For this repo, `frontend/js/lib/wallet-core/adapters/ethers.js` creates an ethers v6 `BrowserProvider` from the ethers module supplied by the app.
 
 ## Optional Chain Helper
 
@@ -93,3 +93,16 @@ a compatibility facade for older imports and re-exports the same adapter API.
 ## Compatibility Files
 
 Root `discovery.js` and `session.js` currently re-export the neutral `core/` modules for transition safety. New integrations should use `index.js` unless they are intentionally testing internals.
+
+## Shared Repo Readiness
+
+Phase 8 keeps this app consuming local served files, but the wallet-core folder now has
+an `EXPORT_MANIFEST.json` and standalone repo README candidate. Run this from the repo
+root to produce a clean export copy:
+
+```bash
+npm run wallet-core:export
+```
+
+The generated `dist/wallet-core/` folder is intentionally ignored by git. It is a
+staging artifact for creating or syncing the future shared repository.
