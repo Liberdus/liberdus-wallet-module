@@ -12,6 +12,7 @@
     "test:e2e:non-smoke": "playwright test --grep-invert @smoke",
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy-local.js --network localhost",
+    "demo:claim:local": "hardhat run scripts/seed-local-claim.js --network localhost",
     "deploy:airdrop:bsc:testnet": "hardhat run scripts/deploy-airdrop.js --network bscTestnet",
     "deploy:airdrop:bsc:mainnet": "hardhat run scripts/deploy-airdrop.js --network bsc",
     "verify:airdrop:bsc:testnet": "hardhat run scripts/verify-airdrop.js --network bscTestnet",

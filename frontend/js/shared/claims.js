@@ -1,6 +1,6 @@
 import { normalizeAddress } from "./format.js";
 import { buildClaimRound } from "./merkle.js";
-import { CLAIMS_STORAGE_KEY } from "./constants.js";
+import { CLAIMS_STORAGE_KEY, UI_ROOT } from "./constants.js";
 
 function nowIso() {
   return new Date().toISOString();
@@ -206,6 +206,39 @@ function getClaimRecordsForWallet(deployment, walletAddress, { deployedOnly = fa
   return records;
 }
 
+function isLocalhost() {
+  return window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+}
+
+async function fetchLocalDemoClaimRecords(config, walletAddress) {
+  if (!isLocalhost()) return [];
+
+  try {
+    const response = await fetch(new URL("./demo-claim.local.json", UI_ROOT), { cache: "no-store" });
+    if (!response.ok) return [];
+
+    const seed = await response.json();
+    if (!seed || typeof seed !== "object") return [];
+    if (String(seed.deploymentKey || "") !== normalizeDeploymentKey(config)) return [];
+
+    const round = normalizeRoundForStorage(seed.round || {});
+    if (round.status !== "deployed") return [];
+
+    const normalizedWallet = normalizeAddress(walletAddress)?.toLowerCase();
+    if (!normalizedWallet) return [];
+
+    const claim = (Array.isArray(seed.claims) ? seed.claims : [])
+      .map((entry) => normalizeClaimForStorage(round.id, entry, entry?.id || 1, entry?.createdAt || nowIso()))
+      .find((entry) => normalizeAddress(entry.account)?.toLowerCase() === normalizedWallet);
+
+    if (!claim) return [];
+
+    return [toRoundClaimResponse(round, claim)];
+  } catch {
+    return [];
+  }
+}
+
 export function isClaimsApiConfigured() {
   return typeof window !== "undefined" && Boolean(window.localStorage);
 }
@@ -213,7 +246,9 @@ export function isClaimsApiConfigured() {
 export async function fetchWalletClaimRounds(config, walletAddress) {
   const state = readState();
   const deployment = getDeployment(state, config);
-  const rounds = getClaimRecordsForWallet(deployment, walletAddress, { deployedOnly: true })
+  const storedRounds = getClaimRecordsForWallet(deployment, walletAddress, { deployedOnly: true });
+  const demoRounds = await fetchLocalDemoClaimRecords(config, walletAddress);
+  const rounds = [...storedRounds, ...demoRounds]
     .map(({ round, entry }) => ({
       ...round,
       entry,
