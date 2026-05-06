@@ -46,8 +46,6 @@ function copyManifestFiles(manifest, outputDir) {
     ...(manifest.entrypoints || []),
     ...(manifest.coreFiles || []),
     ...(manifest.compatibilityFiles || []),
-    ...(manifest.docs || []),
-    "EXPORT_MANIFEST.json",
   ];
 
   for (const relativePath of files) {
@@ -74,8 +72,8 @@ function cleanOutputDir(outputDir) {
 function writePackageMetadata(manifest, outputDir) {
   const packageMetadata = {
     name: manifest.name,
-    private: true,
     type: "module",
+    sideEffects: false,
     description: manifest.description,
     exports: {
       ".": "./index.js",
@@ -90,13 +88,6 @@ function writePackageMetadata(manifest, outputDir) {
   );
 }
 
-function writeStandaloneReadme(outputDir) {
-  fs.copyFileSync(
-    path.join(SOURCE_DIR, "SHARED_REPO_README.md"),
-    path.join(outputDir, "README.md"),
-  );
-}
-
 function main() {
   const options = parseArgs(process.argv.slice(2));
   const manifest = readManifest();
@@ -104,7 +95,6 @@ function main() {
   cleanOutputDir(options.outputDir);
   fs.mkdirSync(options.outputDir, { recursive: true });
   copyManifestFiles(manifest, options.outputDir);
-  writeStandaloneReadme(options.outputDir);
   writePackageMetadata(manifest, options.outputDir);
 
   console.log(`Exported wallet core to ${options.outputDir}`);

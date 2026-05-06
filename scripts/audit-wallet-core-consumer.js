@@ -3,6 +3,7 @@ const path = require("node:path");
 
 const REPO_ROOT = path.resolve(__dirname, "..");
 const VENDOR_DIR = path.join(REPO_ROOT, "frontend", "vendor", "liberdus-wallet-core");
+const SOURCE_MANIFEST_PATH = path.join(REPO_ROOT, "frontend", "js", "lib", "wallet-core", "EXPORT_MANIFEST.json");
 
 function readText(relativePath) {
   return fs.readFileSync(path.join(REPO_ROOT, relativePath), "utf8");
@@ -72,21 +73,25 @@ function auditRuntimeImports() {
 }
 
 function auditVendorFiles() {
-  const manifestPath = path.join(VENDOR_DIR, "EXPORT_MANIFEST.json");
-  assert(fs.existsSync(manifestPath), "Vendor wallet core is missing EXPORT_MANIFEST.json.");
-
-  const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+  const manifest = JSON.parse(fs.readFileSync(SOURCE_MANIFEST_PATH, "utf8"));
   const expectedFiles = [
     ...(manifest.entrypoints || []),
     ...(manifest.coreFiles || []),
     ...(manifest.compatibilityFiles || []),
-    ...(manifest.docs || []),
-    "TESTING.md",
     "package.json",
   ];
+  const expectedFileSet = new Set(expectedFiles);
 
   for (const relativePath of expectedFiles) {
     assertFile(path.join("frontend", "vendor", "liberdus-wallet-core", relativePath));
+  }
+
+  const vendorFiles = listFiles(VENDOR_DIR).map((filePath) => path.relative(VENDOR_DIR, filePath));
+  for (const relativePath of vendorFiles) {
+    assert(
+      expectedFileSet.has(relativePath),
+      `Vendor wallet core contains a non-import package file: ${relativePath}`,
+    );
   }
 
   const vendorJsFiles = listFiles(VENDOR_DIR, (filePath) => filePath.endsWith(".js"));

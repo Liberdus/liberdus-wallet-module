@@ -1,7 +1,7 @@
 {
   "name": "liberdus-wallet-core",
-  "private": true,
   "type": "module",
+  "sideEffects": false,
   "description": "Browser ESM wallet discovery and session core for Liberdus apps.",
   "exports": {
     ".": "./index.js",
