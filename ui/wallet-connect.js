@@ -252,7 +252,7 @@ export function createWalletConnectButton({
   function renderButton() {
     const state = getState();
     const label = state.account
-      ? `${state.selectedWalletName || "Wallet"} ${formatAddress(state.account)}`
+      ? formatAddress(state.account)
       : buttonLabel;
 
     button.replaceChildren(document.createTextNode(isBusy ? "Connecting..." : label));
