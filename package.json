@@ -1,37 +1,12 @@
 {
-  "name": "liberdus-airdrop",
-  "version": "1.0.0",
-  "description": "Epoch-based Merkle airdrop contract and Hardhat test harness for Liberdus",
-  "main": "index.js",
-  "scripts": {
-    "clean": "hardhat clean",
-    "compile": "hardhat compile",
-    "test": "hardhat test",
-    "test:e2e": "playwright test",
-    "test:e2e:smoke": "playwright test --grep @smoke",
-    "test:e2e:non-smoke": "playwright test --grep-invert @smoke",
-    "node": "hardhat node",
-    "deploy:local": "hardhat run scripts/deploy-local.js --network localhost",
-    "demo:claim:local": "hardhat run scripts/seed-local-claim.js --network localhost",
-    "deploy:airdrop:bsc:testnet": "hardhat run scripts/deploy-airdrop.js --network bscTestnet",
-    "deploy:airdrop:bsc:mainnet": "hardhat run scripts/deploy-airdrop.js --network bsc",
-    "verify:airdrop:bsc:testnet": "hardhat run scripts/verify-airdrop.js --network bscTestnet",
-    "verify:airdrop:bsc:mainnet": "hardhat run scripts/verify-airdrop.js --network bsc",
-    "fund:owner:local": "hardhat fund-owner-wallet --network localhost",
-    "serve": "node scripts/e2e/static-server.js",
-    "serve:e2e": "node scripts/e2e/static-server.js",
-    "wallet-core:audit-consumer": "node scripts/audit-wallet-core-consumer.js",
-    "wallet-core:export": "node scripts/export-wallet-core.js",
-    "wallet-core:vendor": "node scripts/export-wallet-core.js --out frontend/vendor/liberdus-wallet-core",
-    "merkle": "node scripts/generate-merkle.js"
-  },
-  "devDependencies": {
-    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
-    "@playwright/test": "^1.59.1",
-    "hardhat": "^2.28.0"
-  },
-  "dependencies": {
-    "@openzeppelin/contracts": "^5.4.0",
-    "dotenv": "^17.4.2"
+  "name": "liberdus-wallet-core",
+  "version": "0.1.0",
+  "type": "module",
+  "sideEffects": false,
+  "description": "Browser ESM wallet discovery and session core for Liberdus apps.",
+  "exports": {
+    ".": "./index.js",
+    "./adapters/chain": "./adapters/chain.js",
+    "./adapters/ethers": "./adapters/ethers.js"
   }
 }
