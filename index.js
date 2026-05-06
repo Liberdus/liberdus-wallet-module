@@ -29,3 +29,8 @@ export function createWalletCore({
     subscribe: session.subscribe,
   };
 }
+
+export {
+  createWalletConnectButton,
+  defineWalletConnectElement,
+} from "./ui/wallet-connect.js";
