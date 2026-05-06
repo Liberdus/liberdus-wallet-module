@@ -112,3 +112,9 @@ staging artifact for creating or syncing the future shared repository.
 Phase 8.5 vendors the exported wallet core into `frontend/vendor/liberdus-wallet-core/`
 and points the claim/admin app adapter at that served path. This proves the app can run
 against a shared-repo-shaped local copy before an external repository is introduced.
+
+## Consumer Port Readiness
+
+Phase 9 adds `CONSUMER_PORTING.md` and `npm run wallet-core:audit-consumer` so the next
+consumer can follow the same adapter-first integration pattern and this repo can verify
+that runtime code keeps using the served vendor boundary.

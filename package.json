@@ -20,6 +20,7 @@
     "fund:owner:local": "hardhat fund-owner-wallet --network localhost",
     "serve": "node scripts/e2e/static-server.js",
     "serve:e2e": "node scripts/e2e/static-server.js",
+    "wallet-core:audit-consumer": "node scripts/audit-wallet-core-consumer.js",
     "wallet-core:export": "node scripts/export-wallet-core.js",
     "wallet-core:vendor": "node scripts/export-wallet-core.js --out frontend/vendor/liberdus-wallet-core",
     "merkle": "node scripts/generate-merkle.js"

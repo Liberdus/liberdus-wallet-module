@@ -42,6 +42,12 @@ rg '../lib/wallet-core|js/lib/wallet-core' frontend/js/shared frontend/js/pages
 The final search should return no runtime imports from claim/admin shared code back to
 the old internal wallet-core path.
 
+The same runtime import and vendor dependency checks are available as one command:
+
+```bash
+npm run wallet-core:audit-consumer
+```
+
 For a browser smoke test:
 
 ```bash
