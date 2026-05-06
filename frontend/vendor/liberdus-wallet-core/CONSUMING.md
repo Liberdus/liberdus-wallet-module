@@ -80,8 +80,7 @@ Keep these outside the neutral core:
 ## This Repo's Adapter
 
 The claim/admin pages consume `frontend/js/shared/wallet-adapter.js` directly so the app
-adapter boundary is visible in the integration. `frontend/js/shared/wallet.js` remains as
-a compatibility facade for older imports and re-exports the same adapter API.
+adapter boundary is visible in the integration.
 
 `wallet-adapter.js` is the repo-local boundary that:
 
@@ -90,9 +89,10 @@ a compatibility facade for older imports and re-exports the same adapter API.
 - applies configured-network compatibility rules
 - owns wallet network add/switch prompts
 
-## Compatibility Files
+## Compatibility Cleanup
 
-Root `discovery.js` and `session.js` currently re-export the neutral `core/` modules for transition safety. New integrations should use `index.js` unless they are intentionally testing internals.
+Phase 10 removes transitional compatibility files. New integrations should use
+`index.js` unless they are intentionally testing internals.
 
 ## Shared Repo Readiness
 
@@ -112,3 +112,9 @@ staging artifact for creating or syncing the future shared repository.
 Phase 8.5 vendors the exported wallet core into `frontend/vendor/liberdus-wallet-core/`
 and points the claim/admin app adapter at that served path. This proves the app can run
 against a shared-repo-shaped local copy before an external repository is introduced.
+
+## Consumer Port Readiness
+
+Phase 9 adds `CONSUMER_PORTING.md` and `npm run wallet-core:audit-consumer` so the next
+consumer can follow the same adapter-first integration pattern and this repo can verify
+that runtime code keeps using the served vendor boundary.

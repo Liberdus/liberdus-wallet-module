@@ -43,15 +43,31 @@ function copyFile(relativePath, outputDir) {
 
 function copyManifestFiles(manifest, outputDir) {
   const files = [
-    ...manifest.entrypoints,
-    ...manifest.coreFiles,
-    ...manifest.compatibilityFiles,
-    ...manifest.docs,
+    ...(manifest.entrypoints || []),
+    ...(manifest.coreFiles || []),
+    ...(manifest.compatibilityFiles || []),
+    ...(manifest.docs || []),
     "EXPORT_MANIFEST.json",
   ];
 
   for (const relativePath of files) {
     copyFile(relativePath, outputDir);
+  }
+}
+
+function cleanOutputDir(outputDir) {
+  if (!fs.existsSync(outputDir)) return;
+
+  const entries = fs.readdirSync(outputDir);
+  const manifestPath = path.join(outputDir, "EXPORT_MANIFEST.json");
+  const packagePath = path.join(outputDir, "package.json");
+
+  if (entries.length > 0 && !fs.existsSync(manifestPath) && !fs.existsSync(packagePath)) {
+    throw new Error(`Refusing to clean non-wallet-core output directory: ${outputDir}`);
+  }
+
+  for (const entry of entries) {
+    fs.rmSync(path.join(outputDir, entry), { force: true, recursive: true });
   }
 }
 
@@ -85,6 +101,7 @@ function main() {
   const options = parseArgs(process.argv.slice(2));
   const manifest = readManifest();
 
+  cleanOutputDir(options.outputDir);
   fs.mkdirSync(options.outputDir, { recursive: true });
   copyManifestFiles(manifest, options.outputDir);
   writeStandaloneReadme(options.outputDir);

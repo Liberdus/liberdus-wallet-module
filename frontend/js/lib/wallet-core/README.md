@@ -9,8 +9,6 @@ wallet-core/
   index.js              Public core factory
   core/                 Neutral discovery and session implementation
   adapters/             Optional app/client-library adapters
-  discovery.js          Compatibility re-export
-  session.js            Compatibility re-export
   EXPORT_MANIFEST.json  Files and boundaries for future repo extraction
 ```
 
@@ -47,8 +45,7 @@ await walletCore.connect({ walletId: wallets[0].id });
 
 Apps should keep UI and network policy separate from the core.
 This repo uses `frontend/js/shared/wallet-adapter.js` as the claim/admin app adapter.
-Claim/admin pages import this adapter directly. `frontend/js/shared/wallet.js` remains a
-compatibility facade for older imports.
+Claim/admin pages import this adapter directly.
 The app adapter:
 
 - creates an ethers provider from the raw injected provider
@@ -64,4 +61,4 @@ The app adapter:
 - Low-level chain add/switch RPC helpers live in `adapters/chain.js`, but apps decide when to call them.
 - Wallet compatibility and network policy belong in the app adapter, not the neutral core.
 - The core is browser-first and expects a browser-compatible storage object.
-- Root `discovery.js` and `session.js` are compatibility re-exports; new integrations should prefer `index.js`.
+- Transitional compatibility re-exports were removed in Phase 10; integrations should use `index.js`.

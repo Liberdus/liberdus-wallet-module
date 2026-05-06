@@ -10,13 +10,10 @@
     "core/discovery.js",
     "core/session.js"
   ],
-  "compatibilityFiles": [
-    "discovery.js",
-    "session.js"
-  ],
   "docs": [
     "README.md",
     "CONSUMING.md",
+    "TESTING.md",
     "SHARED_REPO_README.md"
   ],
   "nonGoals": [

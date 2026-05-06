@@ -77,10 +77,10 @@ function auditVendorFiles() {
 
   const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
   const expectedFiles = [
-    ...manifest.entrypoints,
-    ...manifest.coreFiles,
-    ...manifest.compatibilityFiles,
-    ...manifest.docs,
+    ...(manifest.entrypoints || []),
+    ...(manifest.coreFiles || []),
+    ...(manifest.compatibilityFiles || []),
+    ...(manifest.docs || []),
     "TESTING.md",
     "package.json",
   ];
@@ -100,9 +100,24 @@ function auditVendorFiles() {
   }
 }
 
+function auditLegacyCompatibilityRemoved() {
+  const removedFiles = [
+    "frontend/js/shared/wallet.js",
+    "frontend/js/lib/wallet-core/discovery.js",
+    "frontend/js/lib/wallet-core/session.js",
+    "frontend/vendor/liberdus-wallet-core/discovery.js",
+    "frontend/vendor/liberdus-wallet-core/session.js",
+  ];
+
+  for (const relativePath of removedFiles) {
+    assert(!fs.existsSync(path.join(REPO_ROOT, relativePath)), `Legacy compatibility file still exists: ${relativePath}`);
+  }
+}
+
 function main() {
   auditVendorFiles();
   auditRuntimeImports();
+  auditLegacyCompatibilityRemoved();
   console.log("wallet-core-consumer-audit-ok");
 }
 
