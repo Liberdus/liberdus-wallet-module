@@ -260,3 +260,17 @@ http://127.0.0.1:4174/demo.html
 
 The demo is intentionally tiny. It only shows the wallet button/dropdown and logs
 connect/disconnect events.
+
+## Unit Tests
+
+Run the package tests with Node's built-in test runner:
+
+```bash
+npm test
+```
+
+The tests cover:
+
+- chain id conversion and wallet add/switch RPC calls
+- wallet discovery, connect, sync, and disconnect with a mocked injected wallet
+- the minimal UI button/dropdown and connected address-only label

@@ -4,6 +4,9 @@
   "type": "module",
   "sideEffects": false,
   "description": "Browser ESM wallet discovery and session core for Liberdus apps.",
+  "scripts": {
+    "test": "node --test"
+  },
   "exports": {
     ".": "./index.js",
     "./adapters/chain": "./adapters/chain.js",
