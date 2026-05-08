@@ -3,8 +3,17 @@ import { createWalletSession } from "./core/session.js";
 
 export const DEFAULT_WALLET_SESSION_KEY = "liberdus-wallet-module:walletSession";
 
+function getDefaultStorage() {
+  if (typeof window === "undefined") return null;
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
 export function createWalletCore({
-  storage = typeof window !== "undefined" ? window.localStorage : null,
+  storage = getDefaultStorage(),
   walletSessionKey = DEFAULT_WALLET_SESSION_KEY,
   discoveryWaitMs = 250,
 } = {}) {

@@ -128,6 +128,37 @@ test("discovers a legacy injected wallet", async () => {
   assert.equal(wallets[0].info.name, "MetaMask");
 });
 
+test("createWalletCore tolerates blocked localStorage getter", async () => {
+  const provider = createMockProvider();
+  const listeners = new Map();
+  globalThis.window = {
+    ethereum: provider,
+    setTimeout: globalThis.setTimeout,
+    phantom: undefined,
+    get localStorage() {
+      throw new Error("localStorage blocked");
+    },
+    addEventListener(event, handler) {
+      listeners.set(event, handler);
+    },
+    removeEventListener(event, handler) {
+      if (listeners.get(event) === handler) {
+        listeners.delete(event);
+      }
+    },
+    dispatchEvent(event) {
+      listeners.get(event.type)?.(event);
+      return true;
+    },
+  };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const wallets = await walletCore.discoverWallets();
+
+  assert.equal(wallets.length, 1);
+  assert.equal(walletCore.hasWalletSession(), false);
+});
+
 test("connect stores account, chain, selected wallet, and session", async () => {
   const storage = installMockWindow({ provider: createMockProvider() });
   const walletCore = createWalletCore({
