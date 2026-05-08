@@ -21,6 +21,22 @@ function normalizeWalletInfo(info = {}) {
   };
 }
 
+function isObjectLike(value) {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+function safeGetProperty(target, propertyName) {
+  try {
+    return target?.[propertyName];
+  } catch {
+    return undefined;
+  }
+}
+
+function isEip1193Provider(provider) {
+  return isObjectLike(provider) && typeof provider.request === "function";
+}
+
 function matchesWalletNamespaceProvider(namespaceProvider, provider) {
   if (!namespaceProvider || !provider) return false;
   if (namespaceProvider === provider) return true;
@@ -37,11 +53,28 @@ function matchesWalletNamespaceProvider(namespaceProvider, provider) {
 
 function isPhantomNamespaceProvider(provider) {
   if (typeof window === "undefined") return false;
-  return matchesWalletNamespaceProvider(window.phantom?.ethereum, provider);
+  return matchesWalletNamespaceProvider(safeGetProperty(safeGetProperty(window, "phantom"), "ethereum"), provider);
+}
+
+function formatNamespaceWalletName(namespace) {
+  const normalized = String(namespace || "")
+    .replace(/^is/i, "")
+    .replace(/wallet$/i, " Wallet")
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .trim();
+
+  if (!normalized) return "Injected Wallet";
+  return normalized
+    .split(/\s+/)
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
 
 function guessLegacyWalletName(provider) {
   if (provider?.isPhantom || isPhantomNamespaceProvider(provider)) return "Phantom";
+  if (provider?.isTrust || provider?.isTrustWallet) return "Trust Wallet";
+  if (provider?.isOkxWallet || provider?.isOKExWallet) return "OKX Wallet";
   if (provider?.isRabby) return "Rabby";
   if (provider?.isCoinbaseWallet) return "Coinbase Wallet";
   if (provider?.isBraveWallet) return "Brave Wallet";
@@ -53,6 +86,8 @@ function guessLegacyWalletName(provider) {
 
 function guessLegacyWalletRdns(provider) {
   if (provider?.isPhantom || isPhantomNamespaceProvider(provider)) return "com.phantom.browser";
+  if (provider?.isTrust || provider?.isTrustWallet) return "com.trustwallet.app";
+  if (provider?.isOkxWallet || provider?.isOKExWallet) return "com.okex.wallet";
   if (provider?.isRabby) return "io.rabby";
   if (provider?.isCoinbaseWallet) return "com.coinbase.wallet";
   if (provider?.isBraveWallet) return "com.brave.wallet";
@@ -60,6 +95,17 @@ function guessLegacyWalletRdns(provider) {
   if (provider?.isTally) return "so.tally";
   if (provider?.isMetaMask) return "io.metamask";
   return "";
+}
+
+function inferNamespaceWalletInfo(provider, namespace) {
+  return {
+    name: guessLegacyWalletName(provider) === "Injected Wallet"
+      ? formatNamespaceWalletName(namespace)
+      : guessLegacyWalletName(provider),
+    rdns: guessLegacyWalletRdns(provider),
+    icon: "",
+    uuid: "",
+  };
 }
 
 function mergeWalletInfo(primary = {}, secondary = {}) {
@@ -342,20 +388,88 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     });
   }
 
-  function collectLegacyWallets() {
-    if (typeof window === "undefined" || !window.ethereum) return [];
+  function registerLegacyWalletCandidate(candidate, index = 0) {
+    const provider = candidate?.provider;
+    const info = candidate?.info || {};
+    const name = info.name || guessLegacyWalletName(provider);
+    return registerWallet({
+      id: candidate?.id || (index === 0
+        ? LEGACY_DEFAULT_WALLET_ID
+        : createWalletId(LEGACY_WALLET_PREFIX, `${name}-${index + 1}`)),
+      provider,
+      source: LEGACY_WALLET_PREFIX,
+      sortIndex: index,
+      info: {
+        name,
+        rdns: info.rdns || guessLegacyWalletRdns(provider),
+        icon: info.icon || "",
+        uuid: info.uuid || "",
+      },
+    });
+  }
 
-    const namespaceProviders = [...new Set([window.phantom?.ethereum].filter(Boolean))];
-    const rawProviders = Array.isArray(window.ethereum.providers) && window.ethereum.providers.length
-      ? window.ethereum.providers
+  function collectNamespaceWalletCandidates() {
+    if (typeof window === "undefined") return [];
+
+    const candidates = [];
+    const seenProviders = new Set();
+
+    function addProvider(provider, namespace) {
+      if (!isEip1193Provider(provider) || seenProviders.has(provider)) return;
+      seenProviders.add(provider);
+      candidates.push({
+        id: createWalletId(LEGACY_WALLET_PREFIX, namespace || guessLegacyWalletName(provider), "wallet"),
+        provider,
+        info: inferNamespaceWalletInfo(provider, namespace),
+      });
+    }
+
+    let propertyNames = [];
+    try {
+      propertyNames = Object.getOwnPropertyNames(window);
+    } catch {
+      propertyNames = [];
+    }
+
+    for (const propertyName of propertyNames) {
+      if (propertyName === "ethereum") continue;
+      const value = safeGetProperty(window, propertyName);
+      if (!isObjectLike(value)) continue;
+
+      addProvider(value, propertyName);
+      addProvider(safeGetProperty(value, "ethereum"), propertyName);
+      addProvider(safeGetProperty(value, "provider"), propertyName);
+    }
+
+    return candidates;
+  }
+
+  function collectLegacyWallets() {
+    if (typeof window === "undefined") return [];
+
+    const ethereum = safeGetProperty(window, "ethereum");
+    const namespaceCandidates = collectNamespaceWalletCandidates();
+    const rawProviders = Array.isArray(ethereum?.providers) && ethereum.providers.length
+      ? ethereum.providers
       : [];
     const uniqueProviders = [...new Set(rawProviders.filter(Boolean))]
-      .filter((provider) => !(namespaceProviders.length && provider === window.ethereum && !namespaceProviders.includes(provider)));
-    const candidateProviders = [...new Set([...namespaceProviders, ...uniqueProviders])];
+      .filter((provider) => !namespaceCandidates.some((candidate) => candidate.provider === provider));
+    const candidateProviders = [
+      ...namespaceCandidates,
+      ...uniqueProviders.map((provider) => ({
+        provider,
+        info: {
+          name: guessLegacyWalletName(provider),
+          rdns: guessLegacyWalletRdns(provider),
+          icon: "",
+          uuid: "",
+        },
+      })),
+    ];
 
     if (candidateProviders.length) {
       return candidateProviders
-        .map((provider, index) => registerLegacyWallet(provider, index))
+        .map((candidate, index) => registerLegacyWalletCandidate(candidate, index))
         .filter(Boolean);
     }
 
@@ -363,15 +477,11 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       return [];
     }
 
-    if (namespaceProviders.length) {
+    if (!ethereum || providerIds.get(ethereum)) {
       return [];
     }
 
-    if (providerIds.get(window.ethereum)) {
-      return [];
-    }
-
-    const wallet = registerLegacyWallet(window.ethereum, 0);
+    const wallet = registerLegacyWallet(ethereum, 0);
     return wallet ? [wallet] : [];
   }
 

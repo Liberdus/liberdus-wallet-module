@@ -37,7 +37,11 @@ class ThrowingStorage {
   }
 }
 
-function createMockProvider({ account = ACCOUNT, chainId = "0x38" } = {}) {
+function createMockProvider({
+  account = ACCOUNT,
+  chainId = "0x38",
+  providerFlags = { isMetaMask: true },
+} = {}) {
   const listeners = new Map();
   const requests = [];
   const onCalls = [];
@@ -51,7 +55,7 @@ function createMockProvider({ account = ACCOUNT, chainId = "0x38" } = {}) {
   }
 
   return {
-    isMetaMask: true,
+    ...providerFlags,
     requests,
     onCalls,
     removeCalls,
@@ -126,6 +130,41 @@ test("discovers a legacy injected wallet", async () => {
   assert.equal(wallets.length, 1);
   assert.equal(wallets[0].id, "legacy:default");
   assert.equal(wallets[0].info.name, "MetaMask");
+});
+
+test("discovers EVM wallets exposed through browser namespaces", async () => {
+  const metaMaskProvider = createMockProvider();
+  const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
+  const genericProvider = createMockProvider({ providerFlags: {} });
+  const listeners = new Map();
+
+  globalThis.window = {
+    ethereum: { providers: [metaMaskProvider] },
+    trustwallet: { ethereum: trustProvider },
+    frontierWallet: { provider: genericProvider },
+    localStorage: new MemoryStorage(),
+    setTimeout: globalThis.setTimeout,
+    addEventListener(event, handler) {
+      listeners.set(event, handler);
+    },
+    removeEventListener(event, handler) {
+      if (listeners.get(event) === handler) {
+        listeners.delete(event);
+      }
+    },
+    dispatchEvent(event) {
+      listeners.get(event.type)?.(event);
+      return true;
+    },
+  };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  const wallets = await walletCore.discoverWallets();
+  const walletNames = wallets.map((wallet) => wallet.info.name);
+
+  assert.equal(wallets.length, 3);
+  assert.deepEqual(walletNames, ["Trust Wallet", "Frontier Wallet", "MetaMask"]);
 });
 
 test("createWalletCore tolerates blocked localStorage getter", async () => {
