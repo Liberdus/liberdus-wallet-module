@@ -1,5 +1,14 @@
 export function toChainIdHex(chainId) {
-  const numericChainId = Number(chainId);
+  let numericChainId;
+
+  if (typeof chainId === "number") {
+    numericChainId = chainId;
+  } else if (typeof chainId === "string" && chainId.trim()) {
+    numericChainId = Number(chainId.trim());
+  } else {
+    throw new Error("chainId must be a non-negative integer.");
+  }
+
   if (!Number.isInteger(numericChainId) || numericChainId < 0) {
     throw new Error("chainId must be a non-negative integer.");
   }

@@ -20,11 +20,17 @@ function createProvider(handler) {
 }
 
 test("toChainIdHex converts decimal chain ids", () => {
+  assert.equal(toChainIdHex(0), "0x0");
   assert.equal(toChainIdHex(56), "0x38");
   assert.equal(toChainIdHex("97"), "0x61");
+  assert.equal(toChainIdHex("0x38"), "0x38");
 });
 
 test("toChainIdHex rejects invalid chain ids", () => {
+  assert.throws(() => toChainIdHex(null), /non-negative integer/);
+  assert.throws(() => toChainIdHex(undefined), /non-negative integer/);
+  assert.throws(() => toChainIdHex(""), /non-negative integer/);
+  assert.throws(() => toChainIdHex("   "), /non-negative integer/);
   assert.throws(() => toChainIdHex(-1), /non-negative integer/);
   assert.throws(() => toChainIdHex("abc"), /non-negative integer/);
 });

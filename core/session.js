@@ -75,23 +75,54 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
 
   function saveWalletSession(walletId) {
     if (!isStorageUsable(storage)) return;
-    if (!walletId) {
-      storage.removeItem(walletSessionKey);
-      return;
+    try {
+      if (!walletId) {
+        storage.removeItem(walletSessionKey);
+        return;
+      }
+      storage.setItem(walletSessionKey, JSON.stringify({ walletId }));
+    } catch {
+      // Session persistence is best-effort; live wallet state should still work.
     }
-    storage.setItem(walletSessionKey, JSON.stringify({ walletId }));
   }
 
   function clearWalletSession() {
     if (isStorageUsable(storage)) {
-      storage.removeItem(walletSessionKey);
+      try {
+        storage.removeItem(walletSessionKey);
+      } catch {
+        // ignore storage cleanup failures
+      }
     }
     state.sessionWalletId = null;
   }
 
   function getWalletSession() {
     if (!isStorageUsable(storage)) return null;
-    return normalizeWalletSession(storage.getItem(walletSessionKey));
+    try {
+      return normalizeWalletSession(storage.getItem(walletSessionKey));
+    } catch {
+      return null;
+    }
+  }
+
+  function resetConnectionState({ clearSession = true } = {}) {
+    if (clearSession) {
+      clearWalletSession();
+    } else {
+      state.sessionWalletId = null;
+    }
+
+    state.account = null;
+    state.chainId = null;
+    state.chainName = null;
+    state.selectedWalletId = null;
+    state.selectedWalletName = null;
+    state.selectedWalletRdns = null;
+    state.injectedProvider = null;
+    state.providerSource = null;
+    state.isConnecting = false;
+    discovery.applyActiveWallet(null);
   }
 
   function emitEvent(event, data) {
@@ -111,11 +142,18 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
   function handleDiscoveryEvent(event, data) {
     if (event === "accountChanged") {
       const nextAddress = normalizeAddress(Array.isArray(data) ? data[0] : data);
-      if (state.account !== nextAddress) {
-        state.account = nextAddress;
-        if (!nextAddress) {
-          clearWalletSession();
+      const changed = state.account !== nextAddress;
+
+      if (!nextAddress) {
+        resetConnectionState();
+        if (changed) {
+          emitEvent("accountChanged", nextAddress);
         }
+        return;
+      }
+
+      if (changed) {
+        state.account = nextAddress;
         emitEvent("accountChanged", nextAddress);
       }
       return;
@@ -138,6 +176,12 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
   function bindDiscoveryEvents() {
     if (discoveryUnsubscribe) return;
     discoveryUnsubscribe = discovery.subscribe(handleDiscoveryEvent);
+  }
+
+  function releaseDiscoveryEventsIfUnused() {
+    if (!discoveryUnsubscribe || sessionSubscribers.size > 0) return;
+    discoveryUnsubscribe();
+    discoveryUnsubscribe = null;
   }
 
   async function initializeDiscoveryEvents() {
@@ -198,18 +242,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
   }
 
   async function disconnect() {
-    clearWalletSession();
-    state.account = null;
-    state.chainId = null;
-    state.chainName = null;
-    state.selectedWalletId = null;
-    state.selectedWalletName = null;
-    state.selectedWalletRdns = null;
-    state.sessionWalletId = null;
-    state.injectedProvider = null;
-    state.providerSource = null;
-    state.isConnecting = false;
-    discovery.applyActiveWallet(null);
+    resetConnectionState();
     emitEvent("disconnected", null);
   }
 
@@ -219,7 +252,8 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     const selectedWallet = session?.walletId ? await discovery.resolveWalletById(session.walletId) : null;
 
     if (session?.walletId && !selectedWallet) {
-      clearWalletSession();
+      resetConnectionState();
+      return state;
     }
 
     discovery.applyActiveWallet(selectedWallet);
@@ -273,6 +307,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     initializeDiscoveryEvents();
     return () => {
       sessionSubscribers.delete(handler);
+      releaseDiscoveryEventsIfUnused();
     };
   }
 

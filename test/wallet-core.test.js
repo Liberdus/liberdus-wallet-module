@@ -23,13 +23,38 @@ class MemoryStorage {
   }
 }
 
+class ThrowingStorage {
+  getItem() {
+    throw new Error("getItem blocked");
+  }
+
+  setItem() {
+    throw new Error("setItem blocked");
+  }
+
+  removeItem() {
+    throw new Error("removeItem blocked");
+  }
+}
+
 function createMockProvider({ account = ACCOUNT, chainId = "0x38" } = {}) {
   const listeners = new Map();
   const requests = [];
+  const onCalls = [];
+  const removeCalls = [];
+
+  function getListeners(event) {
+    if (!listeners.has(event)) {
+      listeners.set(event, new Set());
+    }
+    return listeners.get(event);
+  }
 
   return {
     isMetaMask: true,
     requests,
+    onCalls,
+    removeCalls,
     async request(payload) {
       requests.push(payload);
       if (payload.method === "eth_requestAccounts") return [account];
@@ -38,15 +63,20 @@ function createMockProvider({ account = ACCOUNT, chainId = "0x38" } = {}) {
       throw new Error(`Unsupported request: ${payload.method}`);
     },
     on(event, handler) {
-      listeners.set(event, handler);
+      onCalls.push(event);
+      getListeners(event).add(handler);
     },
     removeListener(event, handler) {
-      if (listeners.get(event) === handler) {
-        listeners.delete(event);
-      }
+      removeCalls.push(event);
+      getListeners(event).delete(handler);
     },
     emit(event, data) {
-      listeners.get(event)?.(data);
+      for (const handler of getListeners(event)) {
+        handler(data);
+      }
+    },
+    listenerCount(event) {
+      return getListeners(event).size;
     },
   };
 }
@@ -135,6 +165,94 @@ test("sync restores an existing wallet session without prompting", async () => {
     "eth_chainId",
     "eth_accounts",
   ]);
+});
+
+test("sync clears stale saved sessions without reading fallback accounts", async () => {
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
+  storage.setItem("test:wallet-session", JSON.stringify({ walletId: "missing:wallet" }));
+
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.sync();
+
+  const state = walletCore.getState();
+  assert.equal(state.account, null);
+  assert.equal(state.chainId, null);
+  assert.equal(state.selectedWalletId, null);
+  assert.equal(state.selectedWalletName, null);
+  assert.equal(state.selectedWalletRdns, null);
+  assert.equal(state.sessionWalletId, null);
+  assert.equal(state.injectedProvider, null);
+  assert.equal(state.providerSource, null);
+  assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.deepEqual(provider.requests, []);
+});
+
+test("connect succeeds when session storage throws", async () => {
+  installMockWindow({
+    provider: createMockProvider(),
+    storage: new ThrowingStorage(),
+  });
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage: globalThis.window.localStorage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+
+  const state = walletCore.getState();
+  assert.equal(state.account, ACCOUNT.toLowerCase());
+  assert.equal(state.chainId, 56);
+  assert.equal(state.selectedWalletId, "legacy:default");
+  assert.equal(walletCore.hasWalletSession(), false);
+});
+
+test("accountsChanged empty fully clears connected state", async () => {
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  provider.emit("accountsChanged", []);
+
+  const state = walletCore.getState();
+  assert.equal(state.account, null);
+  assert.equal(state.chainId, null);
+  assert.equal(state.chainName, null);
+  assert.equal(state.selectedWalletId, null);
+  assert.equal(state.selectedWalletName, null);
+  assert.equal(state.selectedWalletRdns, null);
+  assert.equal(state.sessionWalletId, null);
+  assert.equal(state.injectedProvider, null);
+  assert.equal(state.providerSource, null);
+  assert.equal(storage.getItem("test:wallet-session"), null);
+});
+
+test("unsubscribing the last subscriber removes provider listeners", async () => {
+  const provider = createMockProvider();
+  installMockWindow({ provider });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  const unsubscribe = walletCore.subscribe(() => {});
+
+  assert.equal(provider.listenerCount("accountsChanged"), 1);
+  assert.equal(provider.listenerCount("chainChanged"), 1);
+
+  unsubscribe();
+
+  assert.equal(provider.listenerCount("accountsChanged"), 0);
+  assert.equal(provider.listenerCount("chainChanged"), 0);
+  assert.deepEqual(provider.removeCalls, ["accountsChanged", "chainChanged"]);
 });
 
 test("disconnect clears wallet session state", async () => {
