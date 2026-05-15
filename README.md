@@ -1,126 +1,276 @@
-# liberdus-wallet-module
+# Liberdus Wallet Core
 
-Frontend-only wallet module base and Hardhat test harness for Liberdus dapps.
+`liberdus-wallet-core` is a small browser ESM wallet connection package. It is meant
+to be imported into other projects without bringing along the old claim page,
+contracts, Hardhat setup, Playwright tests, or app-specific Liberdus reward logic.
 
-This repo keeps the Solidity contracts, static claimant/admin UIs, local Hardhat deployment scripts, and Playwright coverage. It no longer requires a backend server or database. Admin-created rounds, claim proofs, account rows, and recovery-import test data are stored in the local browser for the active `deploymentKey`.
+The package contains:
 
-## Local Usage
+- `index.js`: public wallet core factory and UI exports
+- `core/`: neutral wallet discovery and session state
+- `adapters/`: optional helpers for chain switching and ethers v6
+- `ui/`: a minimal connect button and wallet picker dropdown
+- `demo.html`: repo-only browser demo for testing the UI
+
+The wallet core supports injected EIP-1193 wallets, including EIP-6963 wallet
+discovery when wallets provide it. It is not tied to MetaMask only.
+
+## Import Paths
+
+```js
+import { createWalletCore } from "liberdus-wallet-core";
+import { switchOrAddEthereumChain } from "liberdus-wallet-core/adapters/chain";
+import { createBrowserProvider } from "liberdus-wallet-core/adapters/ethers";
+import { createWalletConnectButton } from "liberdus-wallet-core/ui/wallet-connect";
+```
+
+For local browser testing from this repo, import from relative files instead:
+
+```js
+import { createWalletCore } from "./index.js";
+import { createWalletConnectButton } from "./ui/wallet-connect.js";
+```
+
+## Core Only
+
+Use the core when your app already has its own button, modal, state store, and
+network policy.
+
+```js
+import { createWalletCore } from "liberdus-wallet-core";
+
+const walletCore = createWalletCore({
+  storage: window.localStorage,
+  walletSessionKey: "my-app:wallet-session",
+  discoveryWaitMs: 250,
+});
+
+const wallets = await walletCore.discoverWallets();
+const selectedWallet = wallets[0];
+
+if (!selectedWallet) {
+  throw new Error("No compatible wallet was found.");
+}
+
+await walletCore.connect({ walletId: selectedWallet.id });
+
+const state = walletCore.getState();
+console.log(state.account, state.chainId);
+```
+
+Useful core methods:
+
+- `discoverWallets()`: refresh and return available wallet descriptors
+- `getAvailableWallets()`: return the current wallet list without waiting
+- `connect({ walletId })`: prompt the selected wallet and store the session
+- `disconnect()`: clear session state
+- `sync()`: restore a previous wallet session with `eth_accounts`
+- `getState()`: read account, chain, selected wallet, and provider state
+- `getEip1193Provider()`: get the active raw injected provider
+- `subscribe(handler)`: listen for wallet lifecycle events
+
+## Chain Adapter
+
+Use the chain adapter when your app wants to switch or add a configured EVM
+network. The wallet core does not make network decisions for you.
+
+```js
+import { createWalletCore } from "liberdus-wallet-core";
+import { switchOrAddEthereumChain } from "liberdus-wallet-core/adapters/chain";
+
+const walletCore = createWalletCore();
+const wallets = await walletCore.discoverWallets();
+
+await walletCore.connect({ walletId: wallets[0].id });
+
+await switchOrAddEthereumChain(walletCore.getEip1193Provider(), {
+  chainId: 56,
+  chainName: "BNB Smart Chain",
+  rpcUrls: ["https://bsc-dataseed.binance.org"],
+  nativeCurrency: {
+    name: "BNB",
+    symbol: "BNB",
+    decimals: 18,
+  },
+  blockExplorerUrls: ["https://bscscan.com"],
+});
+```
+
+The chain adapter exports:
+
+- `toChainIdHex(chainId)`
+- `addEthereumChain(provider, config)`
+- `switchEthereumChain(provider, chainId)`
+- `switchOrAddEthereumChain(provider, config)`
+
+## Ethers Adapter
+
+Use the ethers adapter if the consuming project uses ethers v6 and wants a
+`BrowserProvider` after connecting.
+
+```js
+import { ethers } from "ethers";
+import { createWalletCore } from "liberdus-wallet-core";
+import { createBrowserProvider } from "liberdus-wallet-core/adapters/ethers";
+
+const walletCore = createWalletCore();
+const wallets = await walletCore.discoverWallets();
+
+await walletCore.connect({ walletId: wallets[0].id });
+
+const provider = createBrowserProvider(walletCore.getEip1193Provider(), ethers);
+const signer = await provider.getSigner();
+```
+
+If `ethers` is loaded globally in a browser, the second argument is optional.
+
+## Minimal UI
+
+Use the UI when you want a ready-to-drop-in connect button with a small wallet
+selection dropdown.
+
+```html
+<div id="walletButton"></div>
+
+<script type="module">
+  import { createWalletConnectButton } from "liberdus-wallet-core/ui/wallet-connect";
+
+  createWalletConnectButton({
+    target: document.getElementById("walletButton"),
+    buttonLabel: "Connect Wallet",
+    onConnect({ account, state }) {
+      console.log("connected", account, state.chainId);
+    },
+    onDisconnect() {
+      console.log("disconnected");
+    },
+    onError(error) {
+      console.error(error);
+    },
+  });
+</script>
+```
+
+The UI renders:
+
+- a `Connect Wallet` button
+- a dropdown of discovered wallets
+- the wallet prompt after selection
+- the shortened connected address only, such as `0x24f5...CDD4`
+- a disconnect menu while connected
+
+The UI accepts an existing core if your app wants to configure storage or share
+wallet state with other code:
+
+```js
+import {
+  createWalletCore,
+  createWalletConnectButton,
+} from "liberdus-wallet-core";
+
+const walletCore = createWalletCore({
+  walletSessionKey: "my-app:wallet-session",
+});
+
+createWalletConnectButton({
+  target: document.querySelector("#walletButton"),
+  walletCore,
+});
+```
+
+## Modify the UI CSS
+
+The UI injects a small style tag into the page. You can override it with a later
+inline `<style>` block in the consuming app.
+
+```html
+<style>
+  .liberdus-wallet-connect__button {
+    min-height: 40px;
+    padding: 0 14px;
+    border-radius: 6px;
+    background: #0f766e;
+    box-shadow: none;
+  }
+
+  .liberdus-wallet-connect__button:hover {
+    background: #115e59;
+  }
+
+  .liberdus-wallet-connect__menu {
+    width: 280px;
+    border-color: #99f6e4;
+  }
+
+  .liberdus-wallet-connect__icon {
+    border-radius: 6px;
+    background: #ccfbf1;
+    color: #134e4a;
+  }
+</style>
+```
+
+You can also scope overrides to a wrapper:
+
+```html
+<div class="header-wallet">
+  <div id="walletButton"></div>
+</div>
+
+<style>
+  .header-wallet .liberdus-wallet-connect__button {
+    background: #111827;
+    font-size: 13px;
+  }
+
+  .header-wallet .liberdus-wallet-connect__menu {
+    right: 0;
+    left: auto;
+  }
+</style>
+```
+
+## Custom Element Option
+
+If a project prefers declarative markup, register the provided custom element:
+
+```html
+<liberdus-wallet-connect button-label="Connect Wallet"></liberdus-wallet-connect>
+
+<script type="module">
+  import { defineWalletConnectElement } from "liberdus-wallet-core/ui/wallet-connect";
+
+  defineWalletConnectElement();
+</script>
+```
+
+## Local Demo
+
+From this repo, serve the directory and open `demo.html`:
 
 ```bash
-npm install
-npm run compile
+python3 -m http.server 4174 --bind 127.0.0.1
+```
+
+Then visit:
+
+```text
+http://127.0.0.1:4174/demo.html
+```
+
+The demo is intentionally tiny. It only shows the wallet button/dropdown and logs
+connect/disconnect events.
+
+## Unit Tests
+
+Run the package tests with Node's built-in test runner:
+
+```bash
 npm test
 ```
 
-Run the full local dapp:
+The tests cover:
 
-```bash
-npm run node
-npm run deploy:local
-npm run fund:owner:local
-npm run serve
-```
-
-Then open:
-
-- `http://127.0.0.1:4173/frontend/index.html` for the claimant page
-- `http://127.0.0.1:4173/frontend/admin.html` for the owner-only admin page
-
-`npm run deploy:local` writes `frontend/config.local.json` with local Hardhat addresses and a fresh `deploymentKey`. That key scopes browser-local airdrop data so a Hardhat reset does not reuse old local rounds.
-
-## Frontend Storage
-
-The frontend lives in `frontend/` and is served without a framework or build step.
-
-The admin page can:
-
-- build or upload claims JSON
-- save draft rounds in browser storage
-- fund the airdrop contract
-- deploy saved rounds on chain
-- inspect saved round claims
-- import/manage account rows and recovery submissions locally
-
-The claimant page reads wallet-specific proofs from the same browser storage. Persistence is intentionally lightweight and local to the browser; clearing site data removes saved rounds and admin data.
-
-The app-owned `localStorage` keys are namespaced as:
-
-- `liberdus-wallet-module:ui-config` for browser config overrides
-- `liberdus-wallet-module:wallet-session` for the selected wallet session
-- `liberdus-wallet-module:claims:v1` for saved rounds and claim proofs
-- `liberdus-wallet-module:admin:v1` for account rows and recovery submissions
-
-The admin page includes a `Clear Local Storage` action in the workspace header. After confirmation, it removes those namespaced keys, any other key starting with `liberdus-wallet-module:`, and the old `liberdus-airdrop-*` keys from earlier local builds. Onchain contract state is not changed.
-
-## Useful Scripts
-
-```bash
-npm run node
-npm run deploy:local
-npm run fund:owner:local
-npm run serve
-npm run test:e2e
-npm run merkle -- .\path\to\my-round.claims.json
-```
-
-## BSC Deployment
-
-Create a `.env` file from `.env.example` and fill in:
-
-```dotenv
-DEPLOYER_PRIVATE_KEY=
-BSC_TESTNET_RPC_URL=
-BSC_MAINNET_RPC_URL=
-BSC_TESTNET_TOKEN_ADDRESS=
-BSC_MAINNET_TOKEN_ADDRESS=
-BSCSCAN_API_KEY=
-DEPLOY_CONFIRMATIONS=5
-```
-
-Then deploy:
-
-```bash
-npm run deploy:airdrop:bsc:testnet
-```
-
-or for mainnet:
-
-```bash
-npm run deploy:airdrop:bsc:mainnet
-```
-
-Each deployment writes a reusable record to `deployments/<network>/EpochMerkleAirdrop.json`. If `BSCSCAN_API_KEY` is set, the deploy script also verifies automatically on BscScan.
-
-## Contract Behavior
-
-`EpochMerkleAirdrop` is designed around discrete airdrop epochs:
-
-- each new epoch stores one Merkle root and one claim deadline
-- multiple epochs may overlap and remain claimable at the same time
-- claims are tracked independently per epoch with a bitmap
-- claims are allowed only before the epoch deadline
-- the owner can update a deadline or set it to `0` to disable an epoch
-- the contract is funded by transferring the ERC20 token into it directly
-- withdrawals are owner-controlled
-- ownership transfers use OpenZeppelin `Ownable2Step`
-- non-airdrop ERC20 tokens can be recovered by the owner
-
-## Merkle Tree Format
-
-The contract uses the OpenZeppelin standard Merkle tree leaf format:
-
-```solidity
-keccak256(bytes.concat(keccak256(abi.encode(index, account, amount))))
-```
-
-The frontend, tests, and CLI use that same leaf shape:
-
-```text
-[index, account, amount]
-```
-
-with types:
-
-```text
-["uint256", "address", "uint256"]
-```
+- chain id conversion and wallet add/switch RPC calls
+- wallet discovery, connect, sync, and disconnect with a mocked injected wallet
+- the minimal UI button/dropdown and connected address-only label
