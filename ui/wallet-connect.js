@@ -107,6 +107,7 @@ function ensureStyles() {
     }
 
     .liberdus-wallet-connect__wallet,
+    .liberdus-wallet-connect__wallet-summary,
     .liberdus-wallet-connect__disconnect {
       width: 100%;
       min-height: 48px;
@@ -118,6 +119,10 @@ function ensureStyles() {
       background: transparent;
       color: #111827;
       text-align: left;
+    }
+
+    .liberdus-wallet-connect__wallet,
+    .liberdus-wallet-connect__disconnect {
       cursor: pointer;
     }
 
@@ -152,6 +157,10 @@ function ensureStyles() {
       object-fit: cover;
     }
 
+    .liberdus-wallet-connect__icon img[hidden] {
+      display: none;
+    }
+
     .liberdus-wallet-connect__wallet-copy {
       min-width: 0;
       display: grid;
@@ -184,16 +193,23 @@ function ensureStyles() {
 function createWalletIcon(wallet) {
   const icon = document.createElement("span");
   icon.className = "liberdus-wallet-connect__icon";
-  icon.textContent = createWalletInitials(getWalletName(wallet));
+  const fallback = document.createElement("span");
+  fallback.textContent = createWalletInitials(getWalletName(wallet));
+  icon.append(fallback);
 
   if (wallet?.info?.icon) {
     const image = document.createElement("img");
     image.src = wallet.info.icon;
     image.alt = "";
+    image.hidden = true;
     image.addEventListener("load", () => {
-      icon.textContent = "";
-      icon.append(image);
+      fallback.remove();
+      image.hidden = false;
     });
+    image.addEventListener("error", () => {
+      image.remove();
+    });
+    icon.append(image);
   }
 
   return icon;
@@ -269,7 +285,28 @@ export function createWalletConnectButton({
 
     const title = document.createElement("div");
     title.className = "liberdus-wallet-connect__title";
-    title.textContent = state.account ? formatAddress(state.account) : "Wallet";
+    title.textContent = "Connected Wallet";
+
+    const walletSummary = document.createElement("div");
+    walletSummary.className = "liberdus-wallet-connect__wallet-summary";
+    const walletCopy = document.createElement("span");
+    walletCopy.className = "liberdus-wallet-connect__wallet-copy";
+
+    const walletName = document.createElement("span");
+    walletName.className = "liberdus-wallet-connect__wallet-name";
+    walletName.textContent = state.selectedWalletName || "Wallet";
+
+    const walletMeta = document.createElement("span");
+    walletMeta.className = "liberdus-wallet-connect__wallet-meta";
+    walletMeta.textContent = state.account ? formatAddress(state.account) : "Connected";
+
+    walletCopy.append(walletName, walletMeta);
+    walletSummary.append(createWalletIcon({
+      info: {
+        name: state.selectedWalletName || "Wallet",
+        icon: state.selectedWalletIcon || "",
+      },
+    }), walletCopy);
 
     const disconnect = document.createElement("button");
     disconnect.type = "button";
@@ -282,7 +319,7 @@ export function createWalletConnectButton({
       if (typeof onDisconnect === "function") onDisconnect();
     });
 
-    menu.append(title, disconnect);
+    menu.append(title, walletSummary, disconnect);
   }
 
   function renderWalletMenu() {
