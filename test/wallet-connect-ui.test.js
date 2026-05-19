@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { createWalletConnectButton } from "../ui/wallet-connect.js";
 
 const ACCOUNT = "0x24f55B1e86D67ca62146618Ee486AA4DF611CDD4";
+const WALLET_ICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>";
 
 let originalDocument;
 
@@ -157,7 +158,7 @@ function createMockWalletCore() {
     info: {
       name: "MetaMask",
       rdns: "io.metamask",
-      icon: "",
+      icon: WALLET_ICON,
     },
   };
 
@@ -231,6 +232,25 @@ test("wallet connect UI renders a button and wallet dropdown", async () => {
   assert.equal(menu.hidden, false);
   assert.match(menu.textContent, /Select Wallet/);
   assert.match(menu.textContent, /MetaMask/);
+
+  control.destroy();
+});
+
+test("wallet connect UI renders wallet logo images next to wallet names", async () => {
+  const target = document.createElement("div");
+  const control = createWalletConnectButton({
+    target,
+    walletCore: createMockWalletCore(),
+  });
+  const [, menu] = control.element.children;
+
+  await control.open();
+  const walletOption = menu.children.find((child) => child.dataset?.walletId === "legacy:default");
+  const icon = walletOption.children[0];
+  const image = icon.children.find((child) => child.tagName === "IMG");
+
+  assert.equal(image.src, WALLET_ICON);
+  assert.equal(image.hidden, true);
 
   control.destroy();
 });

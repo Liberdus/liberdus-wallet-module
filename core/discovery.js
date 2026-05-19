@@ -12,11 +12,20 @@ function normalizeWalletIdentityValue(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizeWalletIcon(value) {
+  const icon = String(value || "").trim();
+  if (!icon) return "";
+
+  return /^(data:image\/|https?:\/\/|ipfs:\/\/|ar:\/\/|blob:|chrome-extension:\/\/|moz-extension:\/\/|safari-web-extension:\/\/)/i.test(icon)
+    ? icon
+    : "";
+}
+
 function normalizeWalletInfo(info = {}) {
   return {
     uuid: normalizeWalletIdentityValue(info.uuid),
     name: String(info.name || "").trim(),
-    icon: String(info.icon || "").trim(),
+    icon: normalizeWalletIcon(info.icon),
     rdns: normalizeWalletIdentityValue(info.rdns),
   };
 }
@@ -31,6 +40,28 @@ function safeGetProperty(target, propertyName) {
   } catch {
     return undefined;
   }
+}
+
+function safeGetNestedProperty(target, propertyNames) {
+  return propertyNames.reduce((value, propertyName) => safeGetProperty(value, propertyName), target);
+}
+
+function firstStringValue(...values) {
+  for (const value of values) {
+    if (typeof value === "string" && value.trim()) return value.trim();
+  }
+  return "";
+}
+
+function firstWalletIconValue(...values) {
+  for (const value of values) {
+    const candidates = Array.isArray(value) ? value : [value];
+    for (const candidate of candidates) {
+      const icon = normalizeWalletIcon(candidate);
+      if (icon) return icon;
+    }
+  }
+  return "";
 }
 
 function isEip1193Provider(provider) {
@@ -97,14 +128,70 @@ function guessLegacyWalletRdns(provider) {
   return "";
 }
 
-function inferNamespaceWalletInfo(provider, namespace) {
+function getProviderWalletInfo(provider) {
+  const info = safeGetProperty(provider, "info") || {};
+  const providerInfo = safeGetProperty(provider, "providerInfo") || {};
+  const walletInfo = safeGetProperty(provider, "walletInfo") || {};
+  const metadata = safeGetProperty(provider, "metadata") || {};
+  const peerMetadata = safeGetNestedProperty(provider, ["session", "peer", "metadata"]) || {};
+
   return {
-    name: guessLegacyWalletName(provider) === "Injected Wallet"
-      ? formatNamespaceWalletName(namespace)
-      : guessLegacyWalletName(provider),
-    rdns: guessLegacyWalletRdns(provider),
-    icon: "",
-    uuid: "",
+    name: firstStringValue(
+      safeGetProperty(info, "name"),
+      safeGetProperty(providerInfo, "name"),
+      safeGetProperty(walletInfo, "name"),
+      safeGetProperty(metadata, "name"),
+      safeGetProperty(peerMetadata, "name"),
+    ),
+    rdns: firstStringValue(
+      safeGetProperty(info, "rdns"),
+      safeGetProperty(providerInfo, "rdns"),
+      safeGetProperty(walletInfo, "rdns"),
+      safeGetProperty(metadata, "rdns"),
+    ),
+    uuid: firstStringValue(
+      safeGetProperty(info, "uuid"),
+      safeGetProperty(providerInfo, "uuid"),
+      safeGetProperty(walletInfo, "uuid"),
+      safeGetProperty(metadata, "uuid"),
+    ),
+    icon: firstWalletIconValue(
+      safeGetProperty(info, "icon"),
+      safeGetProperty(info, "icons"),
+      safeGetProperty(providerInfo, "icon"),
+      safeGetProperty(providerInfo, "icons"),
+      safeGetProperty(walletInfo, "icon"),
+      safeGetProperty(walletInfo, "icons"),
+      safeGetProperty(metadata, "icon"),
+      safeGetProperty(metadata, "icons"),
+      safeGetProperty(peerMetadata, "icon"),
+      safeGetProperty(peerMetadata, "icons"),
+    ),
+  };
+}
+
+function inferLegacyWalletInfo(provider, namespace = "", info = {}) {
+  const providerInfo = getProviderWalletInfo(provider);
+  const guessedName = guessLegacyWalletName(provider);
+  const guessedRdns = guessLegacyWalletRdns(provider);
+
+  return {
+    name: info.name
+      || providerInfo.name
+      || (guessedName === "Injected Wallet" ? formatNamespaceWalletName(namespace) : guessedName),
+    rdns: info.rdns || providerInfo.rdns || guessedRdns,
+    icon: info.icon || providerInfo.icon || "",
+    uuid: info.uuid || providerInfo.uuid || "",
+  };
+}
+
+function inferNamespaceWalletInfo(provider, namespace) {
+  const info = inferLegacyWalletInfo(provider, namespace);
+  return {
+    name: info.name,
+    rdns: info.rdns,
+    icon: info.icon,
+    uuid: info.uuid,
   };
 }
 
@@ -112,7 +199,7 @@ function mergeWalletInfo(primary = {}, secondary = {}) {
   return {
     uuid: String(primary.uuid || secondary.uuid || ""),
     name: String(primary.name || secondary.name || "Injected Wallet"),
-    icon: String(primary.icon || secondary.icon || ""),
+    icon: normalizeWalletIcon(primary.icon || secondary.icon || ""),
     rdns: String(primary.rdns || secondary.rdns || ""),
   };
 }
@@ -374,23 +461,19 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
   }
 
   function registerLegacyWallet(provider, index = 0) {
+    const info = inferLegacyWalletInfo(provider);
     return registerWallet({
-      id: index === 0 ? LEGACY_DEFAULT_WALLET_ID : createWalletId(LEGACY_WALLET_PREFIX, `${guessLegacyWalletName(provider)}-${index + 1}`),
+      id: index === 0 ? LEGACY_DEFAULT_WALLET_ID : createWalletId(LEGACY_WALLET_PREFIX, `${info.name}-${index + 1}`),
       provider,
       source: LEGACY_WALLET_PREFIX,
       sortIndex: index,
-      info: {
-        name: guessLegacyWalletName(provider),
-        rdns: guessLegacyWalletRdns(provider),
-        icon: "",
-        uuid: "",
-      },
+      info,
     });
   }
 
   function registerLegacyWalletCandidate(candidate, index = 0) {
     const provider = candidate?.provider;
-    const info = candidate?.info || {};
+    const info = inferLegacyWalletInfo(provider, "", candidate?.info || {});
     const name = info.name || guessLegacyWalletName(provider);
     return registerWallet({
       id: candidate?.id || (index === 0
@@ -399,12 +482,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       provider,
       source: LEGACY_WALLET_PREFIX,
       sortIndex: index,
-      info: {
-        name,
-        rdns: info.rdns || guessLegacyWalletRdns(provider),
-        icon: info.icon || "",
-        uuid: info.uuid || "",
-      },
+      info,
     });
   }
 
@@ -458,12 +536,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       ...namespaceCandidates,
       ...uniqueProviders.map((provider) => ({
         provider,
-        info: {
-          name: guessLegacyWalletName(provider),
-          rdns: guessLegacyWalletRdns(provider),
-          icon: "",
-          uuid: "",
-        },
+        info: inferLegacyWalletInfo(provider),
       })),
     ];
 

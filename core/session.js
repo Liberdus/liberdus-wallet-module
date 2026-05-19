@@ -59,6 +59,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     selectedWalletId: null,
     selectedWalletName: null,
     selectedWalletRdns: null,
+    selectedWalletIcon: null,
     sessionWalletId: null,
     injectedProvider: null,
     providerSource: null,
@@ -119,6 +120,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     state.selectedWalletId = null;
     state.selectedWalletName = null;
     state.selectedWalletRdns = null;
+    state.selectedWalletIcon = null;
     state.injectedProvider = null;
     state.providerSource = null;
     state.isConnecting = false;
@@ -226,6 +228,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
       state.selectedWalletId = wallet.id;
       state.selectedWalletName = wallet.info?.name || null;
       state.selectedWalletRdns = wallet.info?.rdns || null;
+      state.selectedWalletIcon = wallet.info?.icon || null;
       state.sessionWalletId = wallet.id;
       saveWalletSession(wallet.id);
 
@@ -233,6 +236,12 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
         walletId: wallet.id,
         account: state.account,
         chainId: state.chainId,
+        wallet: {
+          id: wallet.id,
+          name: state.selectedWalletName,
+          rdns: state.selectedWalletRdns,
+          icon: state.selectedWalletIcon,
+        },
       });
 
       return state.account;
@@ -261,6 +270,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     state.selectedWalletId = selectedWallet?.id || null;
     state.selectedWalletName = selectedWallet?.info?.name || null;
     state.selectedWalletRdns = selectedWallet?.info?.rdns || null;
+    state.selectedWalletIcon = selectedWallet?.info?.icon || null;
     state.sessionWalletId = session?.walletId || null;
 
     const injected = discovery.getInjectedProvider();

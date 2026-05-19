@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { createWalletCore } from "../index.js";
 
 const ACCOUNT = "0x24f55B1e86D67ca62146618Ee486AA4DF611CDD4";
+const WALLET_ICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>";
 
 let originalWindow;
 
@@ -130,6 +131,27 @@ test("discovers a legacy injected wallet", async () => {
   assert.equal(wallets.length, 1);
   assert.equal(wallets[0].id, "legacy:default");
   assert.equal(wallets[0].info.name, "MetaMask");
+});
+
+test("discovers wallet icons from legacy provider metadata", async () => {
+  installMockWindow({
+    provider: createMockProvider({
+      providerFlags: {
+        isMetaMask: true,
+        info: {
+          name: "MetaMask",
+          rdns: "io.metamask",
+          icon: WALLET_ICON,
+        },
+      },
+    }),
+  });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  const wallets = await walletCore.discoverWallets();
+
+  assert.equal(wallets.length, 1);
+  assert.equal(wallets[0].info.icon, WALLET_ICON);
 });
 
 test("discovers EVM wallets exposed through browser namespaces", async () => {
