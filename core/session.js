@@ -170,11 +170,12 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     }
 
     if (event === "providerDisconnected") {
-      const wasConnected = hasActiveConnectionState();
-      resetConnectionState();
-      if (wasConnected) {
-        emitEvent("disconnected", null);
+      if (!hasActiveConnectionState()) {
+        return;
       }
+
+      resetConnectionState();
+      emitEvent("disconnected", null);
       return;
     }
 

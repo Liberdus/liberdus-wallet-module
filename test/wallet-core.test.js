@@ -385,6 +385,33 @@ test("provider disconnect clears connected state and emits disconnected", async 
   unsubscribe();
 });
 
+test("fallback provider disconnect before sync preserves saved session", async () => {
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
+  storage.setItem("test:wallet-session", JSON.stringify({ walletId: "legacy:default" }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+  const events = [];
+  const unsubscribe = walletCore.subscribe((event) => {
+    events.push(event);
+  });
+
+  provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({ walletId: "legacy:default" }));
+  assert.equal(events.includes("disconnected"), false);
+
+  await walletCore.sync();
+
+  assert.equal(walletCore.getState().account, ACCOUNT.toLowerCase());
+  assert.equal(walletCore.hasWalletSession(), true);
+
+  unsubscribe();
+});
+
 test("provider disconnect listener moves when active wallet changes", async () => {
   const metaMaskProvider = createMockProvider();
   const rabbyProvider = createMockProvider({ providerFlags: { isRabby: true } });
