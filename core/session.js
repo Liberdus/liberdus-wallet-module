@@ -205,7 +205,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
   }
 
   function hasActiveConnectionState() {
-    return Boolean(state.account || state.selectedWalletId || state.sessionWalletId || state.injectedProvider);
+    return Boolean(state.account || state.selectedWalletId || state.sessionWalletId);
   }
 
   function hasWalletSession() {
