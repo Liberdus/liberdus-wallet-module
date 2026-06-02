@@ -339,16 +339,92 @@ test("unsubscribing the last subscriber removes provider listeners", async () =>
 
   assert.equal(provider.listenerCount("accountsChanged"), 1);
   assert.equal(provider.listenerCount("chainChanged"), 1);
+  assert.equal(provider.listenerCount("disconnect"), 1);
 
   unsubscribe();
 
   assert.equal(provider.listenerCount("accountsChanged"), 0);
   assert.equal(provider.listenerCount("chainChanged"), 0);
-  assert.deepEqual(provider.removeCalls, ["accountsChanged", "chainChanged"]);
+  assert.equal(provider.listenerCount("disconnect"), 0);
+  assert.deepEqual(provider.removeCalls, ["accountsChanged", "chainChanged", "disconnect"]);
+});
+
+test("provider disconnect clears connected state and emits disconnected", async () => {
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+  const events = [];
+  const unsubscribe = walletCore.subscribe((event) => {
+    events.push(event);
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+
+  const state = walletCore.getState();
+  assert.equal(state.account, null);
+  assert.equal(state.chainId, null);
+  assert.equal(state.chainName, null);
+  assert.equal(state.selectedWalletId, null);
+  assert.equal(state.selectedWalletName, null);
+  assert.equal(state.selectedWalletRdns, null);
+  assert.equal(state.selectedWalletIcon, null);
+  assert.equal(state.sessionWalletId, null);
+  assert.equal(state.injectedProvider, null);
+  assert.equal(state.providerSource, null);
+  assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.equal(provider.listenerCount("accountsChanged"), 0);
+  assert.equal(provider.listenerCount("chainChanged"), 0);
+  assert.equal(provider.listenerCount("disconnect"), 0);
+  assert.equal(events.filter((event) => event === "disconnected").length, 1);
+
+  unsubscribe();
+});
+
+test("provider disconnect listener moves when active wallet changes", async () => {
+  const metaMaskProvider = createMockProvider();
+  const rabbyProvider = createMockProvider({ providerFlags: { isRabby: true } });
+  const listeners = new Map();
+
+  globalThis.window = {
+    ethereum: { providers: [metaMaskProvider, rabbyProvider] },
+    localStorage: new MemoryStorage(),
+    setTimeout: globalThis.setTimeout,
+    addEventListener(event, handler) {
+      listeners.set(event, handler);
+    },
+    removeEventListener(event, handler) {
+      if (listeners.get(event) === handler) {
+        listeners.delete(event);
+      }
+    },
+    dispatchEvent(event) {
+      listeners.get(event.type)?.(event);
+      return true;
+    },
+  };
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const unsubscribe = walletCore.subscribe(() => {});
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  assert.equal(metaMaskProvider.listenerCount("disconnect"), 1);
+  assert.equal(rabbyProvider.listenerCount("disconnect"), 0);
+
+  await walletCore.connect({ walletId: "legacy:rabby-2" });
+  assert.equal(metaMaskProvider.listenerCount("disconnect"), 0);
+  assert.equal(rabbyProvider.listenerCount("disconnect"), 1);
+  assert.deepEqual(metaMaskProvider.removeCalls, ["accountsChanged", "chainChanged", "disconnect"]);
+
+  unsubscribe();
 });
 
 test("disconnect clears wallet session state", async () => {
-  const storage = installMockWindow({ provider: createMockProvider() });
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
   const walletCore = createWalletCore({
     discoveryWaitMs: 0,
     storage,
@@ -363,4 +439,7 @@ test("disconnect clears wallet session state", async () => {
   assert.equal(state.selectedWalletId, null);
   assert.equal(walletCore.hasWalletSession(), false);
   assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.equal(provider.listenerCount("accountsChanged"), 0);
+  assert.equal(provider.listenerCount("chainChanged"), 0);
+  assert.equal(provider.listenerCount("disconnect"), 0);
 });
