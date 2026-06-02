@@ -623,9 +623,16 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     return listWalletsSnapshot();
   }
 
-  function applyActiveWallet(wallet, { listenToReadOnlyProvider: shouldListenToReadOnlyProvider = true } = {}) {
+  function applyActiveWallet(wallet) {
     activeInjectedProvider = wallet?.provider || null;
-    listenToReadOnlyProvider = shouldListenToReadOnlyProvider;
+    listenToReadOnlyProvider = true;
+    syncWalletEventProvider();
+    emitEvent("providersChanged", listWalletsSnapshot());
+  }
+
+  function clearActiveWallet() {
+    activeInjectedProvider = null;
+    listenToReadOnlyProvider = false;
     syncWalletEventProvider();
     emitEvent("providersChanged", listWalletsSnapshot());
   }
@@ -653,6 +660,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     getAvailableWallets,
     resolveWalletById,
     applyActiveWallet,
+    clearActiveWallet,
     getInjectedProvider,
     subscribe: (handler) => {
       walletEventSubscribers.add(handler);

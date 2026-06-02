@@ -124,7 +124,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     state.injectedProvider = null;
     state.providerSource = null;
     state.isConnecting = false;
-    discovery.applyActiveWallet(null, { listenToReadOnlyProvider: false });
+    discovery.clearActiveWallet();
   }
 
   function emitEvent(event, data) {
