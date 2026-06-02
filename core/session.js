@@ -50,7 +50,12 @@ function isStorageUsable(storage) {
   return storage && typeof storage.getItem === "function" && typeof storage.setItem === "function" && typeof storage.removeItem === "function";
 }
 
-export function createWalletSession({ discovery, storage, walletSessionKey = "liberdus-wallet-module:walletSession" } = {}) {
+export function createWalletSession({
+  discovery,
+  revokePermissionsOnDisconnect = true,
+  storage,
+  walletSessionKey = "liberdus-wallet-module:walletSession",
+} = {}) {
   const sessionSubscribers = new Set();
   const state = {
     account: null,
@@ -151,6 +156,10 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
         if (changed) {
           emitEvent("accountChanged", nextAddress);
         }
+        return;
+      }
+
+      if (!hasActiveConnectionState()) {
         return;
       }
 
@@ -264,7 +273,18 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     }
   }
 
-  async function disconnect() {
+  async function disconnect({ revokePermissions = revokePermissionsOnDisconnect } = {}) {
+    if (revokePermissions && hasActiveConnectionState()) {
+      try {
+        await discovery.getInjectedProvider()?.request({
+          method: "wallet_revokePermissions",
+          params: [{ eth_accounts: {} }],
+        });
+      } catch {
+        // Unsupported wallet permission APIs should not block local disconnect.
+      }
+    }
+
     resetConnectionState();
     emitEvent("disconnected", null);
   }

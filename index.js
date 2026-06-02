@@ -16,10 +16,12 @@ export function createWalletCore({
   storage = getDefaultStorage(),
   walletSessionKey = DEFAULT_WALLET_SESSION_KEY,
   discoveryWaitMs = 250,
+  revokePermissionsOnDisconnect = true,
 } = {}) {
   const discovery = createWalletDiscovery({ discoveryWaitMs });
   const session = createWalletSession({
     discovery,
+    revokePermissionsOnDisconnect,
     storage,
     walletSessionKey,
   });
