@@ -113,6 +113,22 @@ function installMockWindow({ provider, storage = new MemoryStorage() }) {
   return storage;
 }
 
+function announceWallet(walletId, name, provider, { rdns = `org.liberdus.${walletId}` } = {}) {
+  window.dispatchEvent({
+    type: "eip6963:announceProvider",
+    detail: {
+      info: { uuid: walletId, name, rdns },
+      provider,
+    },
+  });
+}
+
+async function flushAsyncEvents() {
+  await new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
 beforeEach(() => {
   originalWindow = globalThis.window;
 });
@@ -289,6 +305,151 @@ test("sync preserves undiscovered saved sessions without reading fallback accoun
   assert.equal(state.providerSource, null);
   assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({ walletId: "missing:wallet" }));
   assert.deepEqual(provider.requests, []);
+});
+
+test("late EIP-6963 announcement restores a saved wallet session", async () => {
+  const storage = installMockWindow({ provider: null });
+  storage.setItem("test:wallet-session", JSON.stringify({
+    walletId: "late-wallet",
+    rdns: "org.liberdus.late-wallet",
+  }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+  const events = [];
+  const unsubscribe = walletCore.subscribe((event, data) => {
+    events.push({ event, data });
+  });
+
+  await walletCore.sync();
+  announceWallet("late-wallet", "Late Wallet", createMockProvider({ providerFlags: {} }));
+  await flushAsyncEvents();
+
+  const state = walletCore.getState();
+  assert.equal(state.account, ACCOUNT.toLowerCase());
+  assert.equal(state.selectedWalletId, "late-wallet");
+  assert.equal(state.selectedWalletName, "Late Wallet");
+  assert.equal(events.filter(({ event }) => event === "connected").length, 1);
+
+  unsubscribe();
+});
+
+test("sync restores a saved EIP-6963 wallet when uuid changes but rdns is stable", async () => {
+  const storage = installMockWindow({ provider: null });
+  storage.setItem("test:wallet-session", JSON.stringify({
+    walletId: "old-uuid",
+    rdns: "io.metamask",
+  }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.sync();
+  announceWallet("new-uuid", "MetaMask", createMockProvider({ providerFlags: {} }), { rdns: "io.metamask" });
+  await flushAsyncEvents();
+
+  const state = walletCore.getState();
+  assert.equal(state.account, ACCOUNT.toLowerCase());
+  assert.equal(state.selectedWalletId, "new-uuid");
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({
+    walletId: "new-uuid",
+    rdns: "io.metamask",
+  }));
+});
+
+test("sync does not restore an ambiguous saved wallet rdns", async () => {
+  const firstProvider = createMockProvider({ providerFlags: {} });
+  const secondProvider = createMockProvider({ providerFlags: {} });
+  const storage = installMockWindow({ provider: null });
+  storage.setItem("test:wallet-session", JSON.stringify({
+    walletId: "old-uuid",
+    rdns: "io.metamask",
+  }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.discoverWallets();
+  announceWallet("first-uuid", "MetaMask", firstProvider, { rdns: "io.metamask" });
+  announceWallet("second-uuid", "MetaMask", secondProvider, { rdns: "io.metamask" });
+  await walletCore.sync();
+
+  assert.equal(walletCore.getState().account, null);
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({
+    walletId: "old-uuid",
+    rdns: "io.metamask",
+  }));
+  assert.deepEqual(firstProvider.requests, []);
+  assert.deepEqual(secondProvider.requests, []);
+});
+
+test("sync clears a discovered saved session when the wallet is unauthorized", async () => {
+  const provider = createMockProvider({ account: null });
+  const storage = installMockWindow({ provider });
+  storage.setItem("test:wallet-session", JSON.stringify({
+    walletId: "legacy:default",
+    rdns: "io.metamask",
+  }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.sync();
+
+  assert.equal(walletCore.getState().account, null);
+  assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.deepEqual(provider.requests.map((request) => request.method), [
+    "eth_chainId",
+    "eth_accounts",
+  ]);
+
+  provider.emit("accountsChanged", [ACCOUNT]);
+  assert.equal(walletCore.getState().account, null);
+});
+
+test("disconnect clears an undiscovered saved wallet session", async () => {
+  const storage = installMockWindow({ provider: null });
+  storage.setItem("test:wallet-session", JSON.stringify({ walletId: "late-wallet" }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.sync();
+  await walletCore.disconnect({ revokePermissions: false });
+
+  assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.equal(walletCore.hasWalletSession(), false);
+});
+
+test("sync restores old saved wallet session formats", async () => {
+  for (const savedSession of ["legacy:default", "injected"]) {
+    const provider = createMockProvider();
+    const storage = installMockWindow({ provider });
+    storage.setItem("test:wallet-session", savedSession);
+    const walletCore = createWalletCore({
+      discoveryWaitMs: 0,
+      storage,
+      walletSessionKey: "test:wallet-session",
+    });
+
+    await walletCore.sync();
+
+    assert.equal(walletCore.getState().account, ACCOUNT.toLowerCase());
+    assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({
+      walletId: "legacy:default",
+      rdns: "io.metamask",
+    }));
+  }
 });
 
 test("connect succeeds when session storage throws", async () => {

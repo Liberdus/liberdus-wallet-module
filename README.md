@@ -64,7 +64,7 @@ Useful core methods:
 - `getAvailableWallets()`: return the current wallet list without waiting
 - `connect({ walletId })`: prompt the selected wallet and store the session
 - `disconnect()`: clear session state
-- `sync()`: restore a previous wallet session with `eth_accounts`
+- `sync()`: restore a previous wallet session with `eth_accounts`; saved EIP-6963 sessions are preserved while the wallet is still announcing
 - `getState()`: read account, chain, selected wallet, and provider state
 - `getEip1193Provider()`: get the active raw injected provider
 - `subscribe(handler)`: listen for wallet lifecycle events
