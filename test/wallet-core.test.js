@@ -64,8 +64,8 @@ function createMockProvider({
     removeCalls,
     async request(payload) {
       requests.push(payload);
-      if (payload.method === "eth_requestAccounts") return [account];
-      if (payload.method === "eth_accounts") return [account];
+      if (payload.method === "eth_requestAccounts") return account ? [account] : [];
+      if (payload.method === "eth_accounts") return account ? [account] : [];
       if (payload.method === "eth_chainId") return chainId;
       if (payload.method === "wallet_revokePermissions") return revokePermissions();
       throw new Error(`Unsupported request: ${payload.method}`);
@@ -239,7 +239,10 @@ test("connect stores account, chain, selected wallet, and session", async () => 
   assert.equal(state.selectedWalletId, "legacy:default");
   assert.equal(state.selectedWalletName, "MetaMask");
   assert.equal(walletCore.hasWalletSession(), true);
-  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({ walletId: "legacy:default" }));
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({
+    walletId: "legacy:default",
+    rdns: "io.metamask",
+  }));
 });
 
 test("sync restores an existing wallet session without prompting", async () => {
@@ -262,7 +265,7 @@ test("sync restores an existing wallet session without prompting", async () => {
   ]);
 });
 
-test("sync clears stale saved sessions without reading fallback accounts", async () => {
+test("sync preserves undiscovered saved sessions without reading fallback accounts", async () => {
   const provider = createMockProvider();
   const storage = installMockWindow({ provider });
   storage.setItem("test:wallet-session", JSON.stringify({ walletId: "missing:wallet" }));
@@ -284,7 +287,7 @@ test("sync clears stale saved sessions without reading fallback accounts", async
   assert.equal(state.sessionWalletId, null);
   assert.equal(state.injectedProvider, null);
   assert.equal(state.providerSource, null);
-  assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({ walletId: "missing:wallet" }));
   assert.deepEqual(provider.requests, []);
 });
 

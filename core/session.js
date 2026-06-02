@@ -27,6 +27,14 @@ function normalizeAddress(address) {
   return trimmed.toLowerCase();
 }
 
+function normalizeSessionText(value) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeSessionRdns(value) {
+  return normalizeSessionText(value).toLowerCase();
+}
+
 function normalizeWalletSession(rawSession) {
   if (!rawSession) return null;
   if (typeof rawSession !== "string") return null;
@@ -36,14 +44,15 @@ function normalizeWalletSession(rawSession) {
   if (rawSession.trim().startsWith("{")) {
     try {
       const parsed = JSON.parse(rawSession);
-      if (typeof parsed?.walletId === "string" && parsed.walletId) {
-        return { walletId: parsed.walletId };
-      }
+      const walletId = normalizeSessionText(parsed?.walletId);
+      const rdns = normalizeSessionRdns(parsed?.rdns);
+      return walletId ? { walletId, ...(rdns ? { rdns } : {}) } : null;
     } catch {
       return null;
     }
   }
-  return rawSession ? { walletId: rawSession } : null;
+  const walletId = normalizeSessionText(rawSession);
+  return walletId ? { walletId } : null;
 }
 
 function isStorageUsable(storage) {
@@ -79,14 +88,18 @@ export function createWalletSession({
     state.providerSource = provider;
   }
 
-  function saveWalletSession(walletId) {
+  function saveWalletSession(wallet) {
     if (!isStorageUsable(storage)) return;
     try {
-      if (!walletId) {
+      if (!wallet?.id) {
         storage.removeItem(walletSessionKey);
         return;
       }
-      storage.setItem(walletSessionKey, JSON.stringify({ walletId }));
+      const rdns = normalizeSessionRdns(wallet.info?.rdns);
+      storage.setItem(walletSessionKey, JSON.stringify({
+        walletId: wallet.id,
+        ...(rdns ? { rdns } : {}),
+      }));
     } catch {
       // Session persistence is best-effort; live wallet state should still work.
     }
@@ -221,6 +234,17 @@ export function createWalletSession({
     return Boolean(getWalletSession()?.walletId);
   }
 
+  async function resolveWalletSession(session) {
+    const wallet = await discovery.resolveWalletById(session.walletId);
+    if (wallet) return wallet;
+
+    if (!session.rdns) return null;
+
+    const wallets = await discovery.discoverWallets();
+    const matches = wallets.filter((candidate) => normalizeSessionRdns(candidate.info?.rdns) === session.rdns);
+    return matches.length === 1 ? matches[0] : null;
+  }
+
   async function connect({ walletId } = {}) {
     const wallet = await discovery.resolveWalletById(walletId);
     if (!wallet) {
@@ -253,7 +277,7 @@ export function createWalletSession({
       state.selectedWalletRdns = wallet.info?.rdns || null;
       state.selectedWalletIcon = wallet.info?.icon || null;
       state.sessionWalletId = wallet.id;
-      saveWalletSession(wallet.id);
+      saveWalletSession(wallet);
 
       emitEvent("connected", {
         walletId: wallet.id,
@@ -292,10 +316,10 @@ export function createWalletSession({
   async function sync() {
     await initializeDiscoveryEvents();
     const session = getWalletSession();
-    const selectedWallet = session?.walletId ? await discovery.resolveWalletById(session.walletId) : null;
+    const selectedWallet = session?.walletId ? await resolveWalletSession(session) : null;
 
     if (session?.walletId && !selectedWallet) {
-      resetConnectionState();
+      resetConnectionState({ clearSession: false });
       return state;
     }
 
@@ -305,7 +329,7 @@ export function createWalletSession({
     state.selectedWalletName = selectedWallet?.info?.name || null;
     state.selectedWalletRdns = selectedWallet?.info?.rdns || null;
     state.selectedWalletIcon = selectedWallet?.info?.icon || null;
-    state.sessionWalletId = session?.walletId || null;
+    state.sessionWalletId = selectedWallet?.id || null;
 
     const injected = discovery.getInjectedProvider();
     if (!injected) {
@@ -337,6 +361,8 @@ export function createWalletSession({
       state.account = account;
       if (!account) {
         clearWalletSession();
+      } else {
+        saveWalletSession(selectedWallet);
       }
     } catch {
       state.account = null;
