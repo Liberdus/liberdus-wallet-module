@@ -81,6 +81,8 @@ export function createWalletSession({
   };
 
   let discoveryUnsubscribe = null;
+  let isSyncing = false;
+  let restorePromise = null;
 
   function updateInjectedProviderState() {
     const provider = discovery.getInjectedProvider();
@@ -159,6 +161,33 @@ export function createWalletSession({
     });
   }
 
+  function emitConnectedEvent() {
+    emitEvent("connected", {
+      walletId: state.selectedWalletId,
+      account: state.account,
+      chainId: state.chainId,
+      wallet: {
+        id: state.selectedWalletId,
+        name: state.selectedWalletName,
+        rdns: state.selectedWalletRdns,
+        icon: state.selectedWalletIcon,
+      },
+    });
+  }
+
+  function restoreSavedSession() {
+    if (isSyncing || restorePromise || state.isConnecting || state.account || !hasWalletSession()) return;
+
+    restorePromise = sync()
+      .then(() => {
+        if (state.account) emitConnectedEvent();
+      })
+      .catch(() => {})
+      .finally(() => {
+        restorePromise = null;
+      });
+  }
+
   function handleDiscoveryEvent(event, data) {
     if (event === "accountChanged") {
       const nextAddress = normalizeAddress(Array.isArray(data) ? data[0] : data);
@@ -203,6 +232,7 @@ export function createWalletSession({
 
     if (event === "providersChanged") {
       emitEvent("providersChanged", data);
+      restoreSavedSession();
       return;
     }
   }
@@ -279,17 +309,7 @@ export function createWalletSession({
       state.sessionWalletId = wallet.id;
       saveWalletSession(wallet);
 
-      emitEvent("connected", {
-        walletId: wallet.id,
-        account: state.account,
-        chainId: state.chainId,
-        wallet: {
-          id: wallet.id,
-          name: state.selectedWalletName,
-          rdns: state.selectedWalletRdns,
-          icon: state.selectedWalletIcon,
-        },
-      });
+      emitConnectedEvent();
 
       return state.account;
     } finally {
@@ -314,62 +334,66 @@ export function createWalletSession({
   }
 
   async function sync() {
-    await initializeDiscoveryEvents();
-    const session = getWalletSession();
-    const selectedWallet = session?.walletId ? await resolveWalletSession(session) : null;
-
-    if (session?.walletId && !selectedWallet) {
-      resetConnectionState({ clearSession: false });
-      return state;
-    }
-
-    discovery.applyActiveWallet(selectedWallet);
-    updateInjectedProviderState();
-    state.selectedWalletId = selectedWallet?.id || null;
-    state.selectedWalletName = selectedWallet?.info?.name || null;
-    state.selectedWalletRdns = selectedWallet?.info?.rdns || null;
-    state.selectedWalletIcon = selectedWallet?.info?.icon || null;
-    state.sessionWalletId = selectedWallet?.id || null;
-
-    const injected = discovery.getInjectedProvider();
-    if (!injected) {
-      state.account = null;
-      state.chainId = null;
-      state.chainName = null;
-      state.sessionWalletId = null;
-      return state;
-    }
-
+    isSyncing = true;
     try {
-      const chainId = parseChainId(await injected.request({ method: "eth_chainId" }));
-      state.chainId = chainId;
-      state.chainName = resolveChainName(chainId, null);
-    } catch {
-      state.chainId = null;
-      state.chainName = null;
-    }
+      await initializeDiscoveryEvents();
+      const session = getWalletSession();
+      const selectedWallet = session?.walletId ? await resolveWalletSession(session) : null;
 
-    if (!session?.walletId) {
-      state.account = null;
-      state.sessionWalletId = null;
-      return state;
-    }
-
-    try {
-      const accounts = await injected.request({ method: "eth_accounts" });
-      const account = normalizeAddress(Array.isArray(accounts) ? accounts[0] : accounts);
-      state.account = account;
-      if (!account) {
-        clearWalletSession();
-      } else {
-        saveWalletSession(selectedWallet);
+      if (session?.walletId && !selectedWallet) {
+        resetConnectionState({ clearSession: false });
+        return state;
       }
-    } catch {
-      state.account = null;
-      clearWalletSession();
-    }
 
-    return state;
+      discovery.applyActiveWallet(selectedWallet);
+      updateInjectedProviderState();
+      state.selectedWalletId = selectedWallet?.id || null;
+      state.selectedWalletName = selectedWallet?.info?.name || null;
+      state.selectedWalletRdns = selectedWallet?.info?.rdns || null;
+      state.selectedWalletIcon = selectedWallet?.info?.icon || null;
+      state.sessionWalletId = selectedWallet?.id || null;
+
+      const injected = discovery.getInjectedProvider();
+      if (!injected) {
+        state.account = null;
+        state.chainId = null;
+        state.chainName = null;
+        state.sessionWalletId = null;
+        return state;
+      }
+
+      try {
+        const chainId = parseChainId(await injected.request({ method: "eth_chainId" }));
+        state.chainId = chainId;
+        state.chainName = resolveChainName(chainId, null);
+      } catch {
+        state.chainId = null;
+        state.chainName = null;
+      }
+
+      if (!session?.walletId) {
+        state.account = null;
+        state.sessionWalletId = null;
+        return state;
+      }
+
+      try {
+        const accounts = await injected.request({ method: "eth_accounts" });
+        const account = normalizeAddress(Array.isArray(accounts) ? accounts[0] : accounts);
+        state.account = account;
+        if (!account) {
+          resetConnectionState();
+        } else {
+          saveWalletSession(selectedWallet);
+        }
+      } catch {
+        resetConnectionState();
+      }
+
+      return state;
+    } finally {
+      isSyncing = false;
+    }
   }
 
   function subscribe(handler) {
