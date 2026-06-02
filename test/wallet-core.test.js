@@ -113,6 +113,22 @@ function installMockWindow({ provider, storage = new MemoryStorage() }) {
   return storage;
 }
 
+function createWalletCoreWithSession(savedSession, provider) {
+  const storage = installMockWindow({ provider });
+  storage.setItem(
+    "test:wallet-session",
+    typeof savedSession === "string" ? savedSession : JSON.stringify(savedSession),
+  );
+  return {
+    storage,
+    walletCore: createWalletCore({
+      discoveryWaitMs: 0,
+      storage,
+      walletSessionKey: "test:wallet-session",
+    }),
+  };
+}
+
 function announceWallet(walletId, name, provider, { rdns = `org.liberdus.${walletId}` } = {}) {
   window.dispatchEvent({
     type: "eip6963:announceProvider",
@@ -308,16 +324,10 @@ test("sync preserves undiscovered saved sessions without reading fallback accoun
 });
 
 test("late EIP-6963 announcement restores a saved wallet session", async () => {
-  const storage = installMockWindow({ provider: null });
-  storage.setItem("test:wallet-session", JSON.stringify({
+  const { walletCore } = createWalletCoreWithSession({
     walletId: "late-wallet",
     rdns: "org.liberdus.late-wallet",
-  }));
-  const walletCore = createWalletCore({
-    discoveryWaitMs: 0,
-    storage,
-    walletSessionKey: "test:wallet-session",
-  });
+  }, null);
   const events = [];
   const unsubscribe = walletCore.subscribe((event, data) => {
     events.push({ event, data });
@@ -337,16 +347,10 @@ test("late EIP-6963 announcement restores a saved wallet session", async () => {
 });
 
 test("sync restores a saved EIP-6963 wallet when uuid changes but rdns is stable", async () => {
-  const storage = installMockWindow({ provider: null });
-  storage.setItem("test:wallet-session", JSON.stringify({
+  const { storage, walletCore } = createWalletCoreWithSession({
     walletId: "old-uuid",
     rdns: "io.metamask",
-  }));
-  const walletCore = createWalletCore({
-    discoveryWaitMs: 0,
-    storage,
-    walletSessionKey: "test:wallet-session",
-  });
+  }, null);
 
   await walletCore.sync();
   announceWallet("new-uuid", "MetaMask", createMockProvider({ providerFlags: {} }), { rdns: "io.metamask" });
@@ -364,16 +368,10 @@ test("sync restores a saved EIP-6963 wallet when uuid changes but rdns is stable
 test("sync does not restore an ambiguous saved wallet rdns", async () => {
   const firstProvider = createMockProvider({ providerFlags: {} });
   const secondProvider = createMockProvider({ providerFlags: {} });
-  const storage = installMockWindow({ provider: null });
-  storage.setItem("test:wallet-session", JSON.stringify({
+  const { storage, walletCore } = createWalletCoreWithSession({
     walletId: "old-uuid",
     rdns: "io.metamask",
-  }));
-  const walletCore = createWalletCore({
-    discoveryWaitMs: 0,
-    storage,
-    walletSessionKey: "test:wallet-session",
-  });
+  }, null);
 
   await walletCore.discoverWallets();
   announceWallet("first-uuid", "MetaMask", firstProvider, { rdns: "io.metamask" });
@@ -391,16 +389,10 @@ test("sync does not restore an ambiguous saved wallet rdns", async () => {
 
 test("sync clears a discovered saved session when the wallet is unauthorized", async () => {
   const provider = createMockProvider({ account: null });
-  const storage = installMockWindow({ provider });
-  storage.setItem("test:wallet-session", JSON.stringify({
+  const { storage, walletCore } = createWalletCoreWithSession({
     walletId: "legacy:default",
     rdns: "io.metamask",
-  }));
-  const walletCore = createWalletCore({
-    discoveryWaitMs: 0,
-    storage,
-    walletSessionKey: "test:wallet-session",
-  });
+  }, provider);
 
   await walletCore.sync();
 
@@ -416,13 +408,7 @@ test("sync clears a discovered saved session when the wallet is unauthorized", a
 });
 
 test("disconnect clears an undiscovered saved wallet session", async () => {
-  const storage = installMockWindow({ provider: null });
-  storage.setItem("test:wallet-session", JSON.stringify({ walletId: "late-wallet" }));
-  const walletCore = createWalletCore({
-    discoveryWaitMs: 0,
-    storage,
-    walletSessionKey: "test:wallet-session",
-  });
+  const { storage, walletCore } = createWalletCoreWithSession({ walletId: "late-wallet" }, null);
 
   await walletCore.sync();
   await walletCore.disconnect({ revokePermissions: false });
@@ -434,13 +420,7 @@ test("disconnect clears an undiscovered saved wallet session", async () => {
 test("sync restores old saved wallet session formats", async () => {
   for (const savedSession of ["legacy:default", "injected"]) {
     const provider = createMockProvider();
-    const storage = installMockWindow({ provider });
-    storage.setItem("test:wallet-session", savedSession);
-    const walletCore = createWalletCore({
-      discoveryWaitMs: 0,
-      storage,
-      walletSessionKey: "test:wallet-session",
-    });
+    const { storage, walletCore } = createWalletCoreWithSession(savedSession, provider);
 
     await walletCore.sync();
 
