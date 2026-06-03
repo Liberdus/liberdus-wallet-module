@@ -193,27 +193,10 @@ test("discovers EVM wallets exposed through browser namespaces", async () => {
   const metaMaskProvider = createMockProvider();
   const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
   const genericProvider = createMockProvider({ providerFlags: {} });
-  const listeners = new Map();
 
-  globalThis.window = {
-    ethereum: { providers: [metaMaskProvider] },
-    trustwallet: { ethereum: trustProvider },
-    frontierWallet: { provider: genericProvider },
-    localStorage: new MemoryStorage(),
-    setTimeout: globalThis.setTimeout,
-    addEventListener(event, handler) {
-      listeners.set(event, handler);
-    },
-    removeEventListener(event, handler) {
-      if (listeners.get(event) === handler) {
-        listeners.delete(event);
-      }
-    },
-    dispatchEvent(event) {
-      listeners.get(event.type)?.(event);
-      return true;
-    },
-  };
+  installMockWindow({ provider: { providers: [metaMaskProvider] } });
+  window.trustwallet = { ethereum: trustProvider };
+  window.frontierWallet = { provider: genericProvider };
 
   const walletCore = createWalletCore({ discoveryWaitMs: 0 });
 
@@ -229,55 +212,25 @@ test("discovers EVM wallets exposed through browser namespaces", async () => {
 
 test("filters non-EVM wallets exposed through browser namespaces", async () => {
   const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
-  const tonProvider = createMockProvider({
-    chainId: "ton-mainnet",
-    providerFlags: { info: { name: "Trust Wallet TON", rdns: "com.trustwallet.ton" } },
-  });
-  const bitcoinProvider = createMockProvider({
-    chainId: "btc-mainnet",
-    providerFlags: { info: { name: "Bitcoin", rdns: "org.bitcoin" } },
-  });
-  const tronProvider = createMockProvider({
-    chainId: "tron-mainnet",
-    providerFlags: { info: { name: "TronLink", rdns: "org.tronlink" } },
-  });
+  const tonProvider = createMockProvider({ chainId: "ton-mainnet", providerFlags: {} });
+  const bitcoinProvider = createMockProvider({ chainId: "btc-mainnet", providerFlags: {} });
+  const tronProvider = createMockProvider({ chainId: "tron-mainnet", providerFlags: {} });
   const throwingProvider = {
-    requests: [],
-    async request(payload) {
-      this.requests.push(payload);
+    async request() {
       throw new Error("Not an EVM provider");
     },
   };
-  const listeners = new Map();
 
-  globalThis.window = {
-    ethereum: { providers: [trustProvider] },
-    trustwallet: { ethereum: trustProvider },
-    trustWalletTon: { provider: tonProvider },
-    bitcoin: { provider: bitcoinProvider },
-    tronLink: { provider: tronProvider },
-    tonWallet: { provider: throwingProvider },
-    localStorage: new MemoryStorage(),
-    setTimeout: globalThis.setTimeout,
-    addEventListener(event, handler) {
-      listeners.set(event, handler);
-    },
-    removeEventListener(event, handler) {
-      if (listeners.get(event) === handler) {
-        listeners.delete(event);
-      }
-    },
-    dispatchEvent(event) {
-      listeners.get(event.type)?.(event);
-      return true;
-    },
-  };
+  installMockWindow({ provider: { providers: [trustProvider] } });
+  window.trustwallet = { ethereum: trustProvider };
+  window.trustWalletTon = { provider: tonProvider };
+  window.bitcoin = { provider: bitcoinProvider };
+  window.tronLink = { provider: tronProvider };
+  window.tonWallet = { provider: throwingProvider };
 
   const walletCore = createWalletCore({ discoveryWaitMs: 0 });
   const wallets = await walletCore.discoverWallets();
 
-  assert.equal(wallets.length, 1);
-  assert.equal(wallets[0].info.name, "Trust Wallet");
   assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["Trust Wallet"]);
 });
 

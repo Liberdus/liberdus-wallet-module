@@ -68,13 +68,10 @@ function isEip1193Provider(provider) {
   return isObjectLike(provider) && typeof provider.request === "function";
 }
 
-function isHexChainId(value) {
-  return typeof value === "string" && /^0x[0-9a-f]+$/i.test(value.trim());
-}
-
 async function isEvmProvider(provider) {
   try {
-    return isHexChainId(await provider.request({ method: "eth_chainId" }));
+    const chainId = await provider.request({ method: "eth_chainId" });
+    return typeof chainId === "string" && /^0x[0-9a-f]+$/i.test(chainId.trim());
   } catch {
     return false;
   }
@@ -583,10 +580,6 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     return wallet ? [wallet] : [];
   }
 
-  function refreshLegacyWallets() {
-    collectLegacyWallets().catch(() => {});
-  }
-
   function requestWalletAnnouncements() {
     if (typeof window === "undefined") return;
     try {
@@ -681,7 +674,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     subscribe: (handler) => {
       walletEventSubscribers.add(handler);
       initWalletDiscovery();
-      refreshLegacyWallets();
+      collectLegacyWallets().catch(() => {});
       syncWalletEventProvider();
       return () => {
         walletEventSubscribers.delete(handler);
