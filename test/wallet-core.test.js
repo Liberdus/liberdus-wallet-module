@@ -234,6 +234,27 @@ test("filters non-EVM wallets exposed through browser namespaces", async () => {
   assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["Trust Wallet"]);
 });
 
+test("discovers primary wallets when namespace chain probes hang", async () => {
+  const metaMaskProvider = createMockProvider();
+  const hangingProvider = {
+    request() {
+      return new Promise(() => {});
+    },
+  };
+
+  installMockWindow({ provider: { providers: [metaMaskProvider] } });
+  window.hangingWallet = { provider: hangingProvider };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const wallets = await Promise.race([
+    walletCore.discoverWallets(),
+    new Promise((resolve) => setTimeout(() => resolve("timed out"), 1000)),
+  ]);
+
+  assert.notEqual(wallets, "timed out");
+  assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["MetaMask"]);
+});
+
 test("discovers EIP-6963 wallets without probing chain during discovery", async () => {
   installMockWindow({ provider: null });
   const provider = createMockProvider({ chainId: "not-a-hex-chain", providerFlags: {} });

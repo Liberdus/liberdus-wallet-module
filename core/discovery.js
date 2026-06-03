@@ -3,6 +3,7 @@ const EIP6963_REQUEST_EVENT = "eip6963:requestProvider";
 const LEGACY_WALLET_PREFIX = "legacy";
 const LEGACY_DEFAULT_WALLET_ID = `${LEGACY_WALLET_PREFIX}:default`;
 const AMBIGUOUS_WALLET_ID = Symbol("ambiguous-wallet-id");
+const NAMESPACE_CHAIN_ID_TIMEOUT_MS = 250;
 
 function createWalletId(source, name, fallback = "wallet") {
   return `${source}:${String(name || fallback).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || fallback}`;
@@ -69,11 +70,19 @@ function isEip1193Provider(provider) {
 }
 
 async function isEvmProvider(provider) {
+  let timeoutId;
   try {
-    const chainId = await provider.request({ method: "eth_chainId" });
+    const chainId = await Promise.race([
+      provider.request({ method: "eth_chainId" }),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(resolve, NAMESPACE_CHAIN_ID_TIMEOUT_MS);
+      }),
+    ]);
     return typeof chainId === "string" && /^0x[0-9a-f]+$/i.test(chainId.trim());
   } catch {
     return false;
+  } finally {
+    clearTimeout(timeoutId);
   }
 }
 
@@ -510,18 +519,20 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
   async function collectNamespaceWalletCandidates() {
     if (typeof window === "undefined") return [];
 
-    const candidates = [];
+    const candidateChecks = [];
     const seenProviders = new Set();
 
-    async function addProvider(provider, namespace) {
+    function addProvider(provider, namespace) {
       if (!isEip1193Provider(provider) || seenProviders.has(provider)) return;
       seenProviders.add(provider);
-      if (!await isEvmProvider(provider)) return;
-      candidates.push({
-        id: createWalletId(LEGACY_WALLET_PREFIX, namespace || guessLegacyWalletName(provider), "wallet"),
-        provider,
-        info: inferNamespaceWalletInfo(provider, namespace),
-      });
+      candidateChecks.push((async () => {
+        if (!await isEvmProvider(provider)) return null;
+        return {
+          id: createWalletId(LEGACY_WALLET_PREFIX, namespace || guessLegacyWalletName(provider), "wallet"),
+          provider,
+          info: inferNamespaceWalletInfo(provider, namespace),
+        };
+      })());
     }
 
     let propertyNames = [];
@@ -536,12 +547,12 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       const value = safeGetProperty(window, propertyName);
       if (!isObjectLike(value)) continue;
 
-      await addProvider(value, propertyName);
-      await addProvider(safeGetProperty(value, "ethereum"), propertyName);
-      await addProvider(safeGetProperty(value, "provider"), propertyName);
+      addProvider(value, propertyName);
+      addProvider(safeGetProperty(value, "ethereum"), propertyName);
+      addProvider(safeGetProperty(value, "provider"), propertyName);
     }
 
-    return candidates;
+    return (await Promise.all(candidateChecks)).filter(Boolean);
   }
 
   async function collectLegacyWallets() {
