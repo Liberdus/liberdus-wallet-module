@@ -193,27 +193,10 @@ test("discovers EVM wallets exposed through browser namespaces", async () => {
   const metaMaskProvider = createMockProvider();
   const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
   const genericProvider = createMockProvider({ providerFlags: {} });
-  const listeners = new Map();
 
-  globalThis.window = {
-    ethereum: { providers: [metaMaskProvider] },
-    trustwallet: { ethereum: trustProvider },
-    frontierWallet: { provider: genericProvider },
-    localStorage: new MemoryStorage(),
-    setTimeout: globalThis.setTimeout,
-    addEventListener(event, handler) {
-      listeners.set(event, handler);
-    },
-    removeEventListener(event, handler) {
-      if (listeners.get(event) === handler) {
-        listeners.delete(event);
-      }
-    },
-    dispatchEvent(event) {
-      listeners.get(event.type)?.(event);
-      return true;
-    },
-  };
+  installMockWindow({ provider: { providers: [metaMaskProvider] } });
+  window.trustwallet = { ethereum: trustProvider };
+  window.frontierWallet = { provider: genericProvider };
 
   const walletCore = createWalletCore({ discoveryWaitMs: 0 });
 
@@ -222,6 +205,86 @@ test("discovers EVM wallets exposed through browser namespaces", async () => {
 
   assert.equal(wallets.length, 3);
   assert.deepEqual(walletNames, ["Trust Wallet", "Frontier Wallet", "MetaMask"]);
+  assert.deepEqual(metaMaskProvider.requests, []);
+  assert.deepEqual(trustProvider.requests.map((request) => request.method), ["eth_chainId"]);
+  assert.deepEqual(genericProvider.requests.map((request) => request.method), ["eth_chainId"]);
+});
+
+test("filters non-EVM wallets exposed through browser namespaces", async () => {
+  const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
+  const tonProvider = createMockProvider({ chainId: "ton-mainnet", providerFlags: {} });
+  const bitcoinProvider = createMockProvider({ chainId: "btc-mainnet", providerFlags: {} });
+  const tronProvider = createMockProvider({ chainId: "tron-mainnet", providerFlags: {} });
+  const throwingProvider = {
+    async request() {
+      throw new Error("Not an EVM provider");
+    },
+  };
+
+  installMockWindow({ provider: { providers: [trustProvider] } });
+  window.trustwallet = { ethereum: trustProvider };
+  window.trustWalletTon = { provider: tonProvider };
+  window.bitcoin = { provider: bitcoinProvider };
+  window.tronLink = { provider: tronProvider };
+  window.tonWallet = { provider: throwingProvider };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const wallets = await walletCore.discoverWallets();
+
+  assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["Trust Wallet"]);
+});
+
+test("discovers primary wallets when namespace chain probes hang", async () => {
+  const metaMaskProvider = createMockProvider();
+  const hangingProvider = {
+    request() {
+      return new Promise(() => {});
+    },
+  };
+
+  installMockWindow({ provider: { providers: [metaMaskProvider] } });
+  window.hangingWallet = { provider: hangingProvider };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const wallets = await Promise.race([
+    walletCore.discoverWallets(),
+    new Promise((resolve) => setTimeout(() => resolve("timed out"), 1000)),
+  ]);
+
+  assert.notEqual(wallets, "timed out");
+  assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["MetaMask"]);
+});
+
+test("discovers EIP-6963 wallets without probing chain during discovery", async () => {
+  installMockWindow({ provider: null });
+  const provider = createMockProvider({ chainId: "not-a-hex-chain", providerFlags: {} });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  await walletCore.discoverWallets();
+  announceWallet("eip-wallet", "EIP Wallet", provider);
+
+  const wallets = await walletCore.discoverWallets();
+
+  assert.equal(wallets.length, 1);
+  assert.equal(wallets[0].id, "eip-wallet");
+  assert.deepEqual(provider.requests, []);
+});
+
+test("subscribers receive initial legacy wallet discovery events", async () => {
+  installMockWindow({ provider: createMockProvider() });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const events = [];
+
+  const unsubscribe = walletCore.subscribe((event, wallets) => {
+    if (event === "providersChanged") {
+      events.push(wallets.map((wallet) => wallet.info.name));
+    }
+  });
+  await flushAsyncEvents();
+
+  assert.deepEqual(events, [["MetaMask"]]);
+
+  unsubscribe();
 });
 
 test("createWalletCore tolerates blocked localStorage getter", async () => {

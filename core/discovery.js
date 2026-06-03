@@ -3,6 +3,7 @@ const EIP6963_REQUEST_EVENT = "eip6963:requestProvider";
 const LEGACY_WALLET_PREFIX = "legacy";
 const LEGACY_DEFAULT_WALLET_ID = `${LEGACY_WALLET_PREFIX}:default`;
 const AMBIGUOUS_WALLET_ID = Symbol("ambiguous-wallet-id");
+const NAMESPACE_CHAIN_ID_TIMEOUT_MS = 250;
 
 function createWalletId(source, name, fallback = "wallet") {
   return `${source}:${String(name || fallback).trim().toLowerCase().replace(/[^a-z0-9]+/g, "-") || fallback}`;
@@ -66,6 +67,23 @@ function firstWalletIconValue(...values) {
 
 function isEip1193Provider(provider) {
   return isObjectLike(provider) && typeof provider.request === "function";
+}
+
+async function isEvmProvider(provider) {
+  let timeoutId;
+  try {
+    const chainId = await Promise.race([
+      provider.request({ method: "eth_chainId" }),
+      new Promise((resolve) => {
+        timeoutId = setTimeout(resolve, NAMESPACE_CHAIN_ID_TIMEOUT_MS);
+      }),
+    ]);
+    return typeof chainId === "string" && /^0x[0-9a-f]+$/i.test(chainId.trim());
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function matchesWalletNamespaceProvider(namespaceProvider, provider) {
@@ -498,20 +516,23 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     });
   }
 
-  function collectNamespaceWalletCandidates() {
+  async function collectNamespaceWalletCandidates() {
     if (typeof window === "undefined") return [];
 
-    const candidates = [];
+    const candidateChecks = [];
     const seenProviders = new Set();
 
     function addProvider(provider, namespace) {
       if (!isEip1193Provider(provider) || seenProviders.has(provider)) return;
       seenProviders.add(provider);
-      candidates.push({
-        id: createWalletId(LEGACY_WALLET_PREFIX, namespace || guessLegacyWalletName(provider), "wallet"),
-        provider,
-        info: inferNamespaceWalletInfo(provider, namespace),
-      });
+      candidateChecks.push((async () => {
+        if (!await isEvmProvider(provider)) return null;
+        return {
+          id: createWalletId(LEGACY_WALLET_PREFIX, namespace || guessLegacyWalletName(provider), "wallet"),
+          provider,
+          info: inferNamespaceWalletInfo(provider, namespace),
+        };
+      })());
     }
 
     let propertyNames = [];
@@ -531,14 +552,14 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       addProvider(safeGetProperty(value, "provider"), propertyName);
     }
 
-    return candidates;
+    return (await Promise.all(candidateChecks)).filter(Boolean);
   }
 
-  function collectLegacyWallets() {
+  async function collectLegacyWallets() {
     if (typeof window === "undefined") return [];
 
     const ethereum = safeGetProperty(window, "ethereum");
-    const namespaceCandidates = collectNamespaceWalletCandidates();
+    const namespaceCandidates = await collectNamespaceWalletCandidates();
     const rawProviders = Array.isArray(ethereum?.providers) && ethereum.providers.length
       ? ethereum.providers
       : [];
@@ -600,7 +621,6 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       }
     });
 
-    collectLegacyWallets();
     requestWalletAnnouncements();
   }
 
@@ -612,12 +632,12 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
 
   async function discoverWallets(waitMs = discoveryWaitMs) {
     initWalletDiscovery();
-    collectLegacyWallets();
+    await collectLegacyWallets();
     requestWalletAnnouncements();
 
     if (waitMs > 0) {
       await wait(waitMs);
-      collectLegacyWallets();
+      await collectLegacyWallets();
     }
 
     return listWalletsSnapshot();
@@ -665,6 +685,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     subscribe: (handler) => {
       walletEventSubscribers.add(handler);
       initWalletDiscovery();
+      collectLegacyWallets().catch(() => {});
       syncWalletEventProvider();
       return () => {
         walletEventSubscribers.delete(handler);
