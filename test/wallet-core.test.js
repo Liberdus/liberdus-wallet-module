@@ -222,6 +222,95 @@ test("discovers EVM wallets exposed through browser namespaces", async () => {
 
   assert.equal(wallets.length, 3);
   assert.deepEqual(walletNames, ["Trust Wallet", "Frontier Wallet", "MetaMask"]);
+  assert.deepEqual(metaMaskProvider.requests, []);
+  assert.deepEqual(trustProvider.requests.map((request) => request.method), ["eth_chainId"]);
+  assert.deepEqual(genericProvider.requests.map((request) => request.method), ["eth_chainId"]);
+});
+
+test("filters non-EVM wallets exposed through browser namespaces", async () => {
+  const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
+  const tonProvider = createMockProvider({
+    chainId: "ton-mainnet",
+    providerFlags: { info: { name: "Trust Wallet TON", rdns: "com.trustwallet.ton" } },
+  });
+  const bitcoinProvider = createMockProvider({
+    chainId: "btc-mainnet",
+    providerFlags: { info: { name: "Bitcoin", rdns: "org.bitcoin" } },
+  });
+  const tronProvider = createMockProvider({
+    chainId: "tron-mainnet",
+    providerFlags: { info: { name: "TronLink", rdns: "org.tronlink" } },
+  });
+  const throwingProvider = {
+    requests: [],
+    async request(payload) {
+      this.requests.push(payload);
+      throw new Error("Not an EVM provider");
+    },
+  };
+  const listeners = new Map();
+
+  globalThis.window = {
+    ethereum: { providers: [trustProvider] },
+    trustwallet: { ethereum: trustProvider },
+    trustWalletTon: { provider: tonProvider },
+    bitcoin: { provider: bitcoinProvider },
+    tronLink: { provider: tronProvider },
+    tonWallet: { provider: throwingProvider },
+    localStorage: new MemoryStorage(),
+    setTimeout: globalThis.setTimeout,
+    addEventListener(event, handler) {
+      listeners.set(event, handler);
+    },
+    removeEventListener(event, handler) {
+      if (listeners.get(event) === handler) {
+        listeners.delete(event);
+      }
+    },
+    dispatchEvent(event) {
+      listeners.get(event.type)?.(event);
+      return true;
+    },
+  };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const wallets = await walletCore.discoverWallets();
+
+  assert.equal(wallets.length, 1);
+  assert.equal(wallets[0].info.name, "Trust Wallet");
+  assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["Trust Wallet"]);
+});
+
+test("discovers EIP-6963 wallets without probing chain during discovery", async () => {
+  installMockWindow({ provider: null });
+  const provider = createMockProvider({ chainId: "not-a-hex-chain", providerFlags: {} });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  await walletCore.discoverWallets();
+  announceWallet("eip-wallet", "EIP Wallet", provider);
+
+  const wallets = await walletCore.discoverWallets();
+
+  assert.equal(wallets.length, 1);
+  assert.equal(wallets[0].id, "eip-wallet");
+  assert.deepEqual(provider.requests, []);
+});
+
+test("subscribers receive initial legacy wallet discovery events", async () => {
+  installMockWindow({ provider: createMockProvider() });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const events = [];
+
+  const unsubscribe = walletCore.subscribe((event, wallets) => {
+    if (event === "providersChanged") {
+      events.push(wallets.map((wallet) => wallet.info.name));
+    }
+  });
+  await flushAsyncEvents();
+
+  assert.deepEqual(events, [["MetaMask"]]);
+
+  unsubscribe();
 });
 
 test("createWalletCore tolerates blocked localStorage getter", async () => {

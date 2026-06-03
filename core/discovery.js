@@ -68,6 +68,18 @@ function isEip1193Provider(provider) {
   return isObjectLike(provider) && typeof provider.request === "function";
 }
 
+function isHexChainId(value) {
+  return typeof value === "string" && /^0x[0-9a-f]+$/i.test(value.trim());
+}
+
+async function isEvmProvider(provider) {
+  try {
+    return isHexChainId(await provider.request({ method: "eth_chainId" }));
+  } catch {
+    return false;
+  }
+}
+
 function matchesWalletNamespaceProvider(namespaceProvider, provider) {
   if (!namespaceProvider || !provider) return false;
   if (namespaceProvider === provider) return true;
@@ -498,15 +510,16 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     });
   }
 
-  function collectNamespaceWalletCandidates() {
+  async function collectNamespaceWalletCandidates() {
     if (typeof window === "undefined") return [];
 
     const candidates = [];
     const seenProviders = new Set();
 
-    function addProvider(provider, namespace) {
+    async function addProvider(provider, namespace) {
       if (!isEip1193Provider(provider) || seenProviders.has(provider)) return;
       seenProviders.add(provider);
+      if (!await isEvmProvider(provider)) return;
       candidates.push({
         id: createWalletId(LEGACY_WALLET_PREFIX, namespace || guessLegacyWalletName(provider), "wallet"),
         provider,
@@ -526,19 +539,19 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       const value = safeGetProperty(window, propertyName);
       if (!isObjectLike(value)) continue;
 
-      addProvider(value, propertyName);
-      addProvider(safeGetProperty(value, "ethereum"), propertyName);
-      addProvider(safeGetProperty(value, "provider"), propertyName);
+      await addProvider(value, propertyName);
+      await addProvider(safeGetProperty(value, "ethereum"), propertyName);
+      await addProvider(safeGetProperty(value, "provider"), propertyName);
     }
 
     return candidates;
   }
 
-  function collectLegacyWallets() {
+  async function collectLegacyWallets() {
     if (typeof window === "undefined") return [];
 
     const ethereum = safeGetProperty(window, "ethereum");
-    const namespaceCandidates = collectNamespaceWalletCandidates();
+    const namespaceCandidates = await collectNamespaceWalletCandidates();
     const rawProviders = Array.isArray(ethereum?.providers) && ethereum.providers.length
       ? ethereum.providers
       : [];
@@ -568,6 +581,10 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
 
     const wallet = registerLegacyWallet(ethereum, 0);
     return wallet ? [wallet] : [];
+  }
+
+  function refreshLegacyWallets() {
+    collectLegacyWallets().catch(() => {});
   }
 
   function requestWalletAnnouncements() {
@@ -600,7 +617,6 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       }
     });
 
-    collectLegacyWallets();
     requestWalletAnnouncements();
   }
 
@@ -612,12 +628,12 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
 
   async function discoverWallets(waitMs = discoveryWaitMs) {
     initWalletDiscovery();
-    collectLegacyWallets();
+    await collectLegacyWallets();
     requestWalletAnnouncements();
 
     if (waitMs > 0) {
       await wait(waitMs);
-      collectLegacyWallets();
+      await collectLegacyWallets();
     }
 
     return listWalletsSnapshot();
@@ -665,6 +681,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     subscribe: (handler) => {
       walletEventSubscribers.add(handler);
       initWalletDiscovery();
+      refreshLegacyWallets();
       syncWalletEventProvider();
       return () => {
         walletEventSubscribers.delete(handler);
