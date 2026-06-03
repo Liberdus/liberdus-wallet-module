@@ -365,6 +365,34 @@ test("sync restores a saved EIP-6963 wallet when uuid changes but rdns is stable
   }));
 });
 
+test("sync preserves saved session when rdns fallback is unauthorized", async () => {
+  const unauthorizedProvider = createMockProvider({ account: null, providerFlags: {} });
+  const savedSession = {
+    walletId: "saved-uuid",
+    rdns: "io.metamask",
+  };
+  const { storage, walletCore } = createWalletCoreWithSession(savedSession, null);
+
+  await walletCore.discoverWallets();
+  announceWallet("other-uuid", "MetaMask", unauthorizedProvider, { rdns: "io.metamask" });
+  await walletCore.sync();
+
+  assert.equal(walletCore.getState().account, null);
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify(savedSession));
+  assert.deepEqual(unauthorizedProvider.requests.map((request) => request.method), [
+    "eth_chainId",
+    "eth_accounts",
+  ]);
+
+  announceWallet("saved-uuid", "MetaMask", createMockProvider({ providerFlags: {} }), { rdns: "io.metamask" });
+  await flushAsyncEvents();
+
+  const state = walletCore.getState();
+  assert.equal(state.account, ACCOUNT.toLowerCase());
+  assert.equal(state.selectedWalletId, "saved-uuid");
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify(savedSession));
+});
+
 test("sync does not restore an ambiguous saved wallet rdns", async () => {
   const firstProvider = createMockProvider({ providerFlags: {} });
   const secondProvider = createMockProvider({ providerFlags: {} });
