@@ -252,6 +252,8 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
   let boundWalletEventProvider = null;
   let boundAccountsChanged = null;
   let boundChainChanged = null;
+  let boundDisconnect = null;
+  let listenToReadOnlyProvider = true;
   let nextEip6963SortIndex = 0;
   const walletEventSubscribers = new Set();
 
@@ -375,13 +377,16 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
   }
 
   function syncWalletEventProvider() {
-    const nextProvider = walletEventSubscribers.size ? activeInjectedProvider || getReadOnlyInjectedProvider() : null;
+    const nextProvider = walletEventSubscribers.size
+      ? activeInjectedProvider || (listenToReadOnlyProvider ? getReadOnlyInjectedProvider() : null)
+      : null;
 
     if (!nextProvider?.on) {
       if (boundWalletEventProvider) {
         try {
           boundWalletEventProvider.removeListener("accountsChanged", boundAccountsChanged);
           boundWalletEventProvider.removeListener("chainChanged", boundChainChanged);
+          boundWalletEventProvider.removeListener("disconnect", boundDisconnect);
         } catch {
           // ignore
         }
@@ -389,6 +394,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       boundWalletEventProvider = null;
       boundAccountsChanged = null;
       boundChainChanged = null;
+      boundDisconnect = null;
       return;
     }
 
@@ -400,6 +406,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       try {
         boundWalletEventProvider.removeListener("accountsChanged", boundAccountsChanged);
         boundWalletEventProvider.removeListener("chainChanged", boundChainChanged);
+        boundWalletEventProvider.removeListener("disconnect", boundDisconnect);
       } catch {
         // ignore
       }
@@ -413,8 +420,13 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       emitEvent("chainChanged", chainId);
     };
 
+    boundDisconnect = async (error) => {
+      emitEvent("providerDisconnected", error || null);
+    };
+
     nextProvider.on("accountsChanged", boundAccountsChanged);
     nextProvider.on("chainChanged", boundChainChanged);
+    nextProvider.on("disconnect", boundDisconnect);
     boundWalletEventProvider = nextProvider;
   }
 
@@ -613,6 +625,14 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
 
   function applyActiveWallet(wallet) {
     activeInjectedProvider = wallet?.provider || null;
+    listenToReadOnlyProvider = true;
+    syncWalletEventProvider();
+    emitEvent("providersChanged", listWalletsSnapshot());
+  }
+
+  function clearActiveWallet() {
+    activeInjectedProvider = null;
+    listenToReadOnlyProvider = false;
     syncWalletEventProvider();
     emitEvent("providersChanged", listWalletsSnapshot());
   }
@@ -640,6 +660,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     getAvailableWallets,
     resolveWalletById,
     applyActiveWallet,
+    clearActiveWallet,
     getInjectedProvider,
     subscribe: (handler) => {
       walletEventSubscribers.add(handler);

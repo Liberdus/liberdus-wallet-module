@@ -339,16 +339,105 @@ test("unsubscribing the last subscriber removes provider listeners", async () =>
 
   assert.equal(provider.listenerCount("accountsChanged"), 1);
   assert.equal(provider.listenerCount("chainChanged"), 1);
+  assert.equal(provider.listenerCount("disconnect"), 1);
 
   unsubscribe();
 
   assert.equal(provider.listenerCount("accountsChanged"), 0);
   assert.equal(provider.listenerCount("chainChanged"), 0);
-  assert.deepEqual(provider.removeCalls, ["accountsChanged", "chainChanged"]);
+  assert.equal(provider.listenerCount("disconnect"), 0);
+  assert.deepEqual(provider.removeCalls, ["accountsChanged", "chainChanged", "disconnect"]);
+});
+
+test("provider disconnect clears connected state and emits disconnected", async () => {
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+  const events = [];
+  const unsubscribe = walletCore.subscribe((event) => {
+    events.push(event);
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+
+  const state = walletCore.getState();
+  assert.equal(state.account, null);
+  assert.equal(state.selectedWalletId, null);
+  assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.equal(provider.listenerCount("disconnect"), 0);
+  assert.equal(events.filter((event) => event === "disconnected").length, 1);
+
+  unsubscribe();
+});
+
+test("fallback provider disconnect before sync preserves saved session", async () => {
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
+  storage.setItem("test:wallet-session", JSON.stringify({ walletId: "legacy:default" }));
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+  const unsubscribe = walletCore.subscribe(() => {});
+
+  provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+
+  assert.equal(storage.getItem("test:wallet-session"), JSON.stringify({ walletId: "legacy:default" }));
+
+  await walletCore.sync();
+
+  assert.equal(walletCore.getState().account, ACCOUNT.toLowerCase());
+  assert.equal(walletCore.hasWalletSession(), true);
+
+  unsubscribe();
+});
+
+test("fallback provider disconnect after sync without a session does not emit disconnected", async () => {
+  const provider = createMockProvider();
+  installMockWindow({ provider });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const events = [];
+  const unsubscribe = walletCore.subscribe((event) => {
+    events.push(event);
+  });
+
+  await walletCore.sync();
+  provider.emit("disconnect", { code: 4900, message: "Disconnected" });
+
+  assert.equal(walletCore.getState().account, null);
+  assert.equal(events.includes("disconnected"), false);
+
+  unsubscribe();
+});
+
+test("provider disconnect listener moves when active wallet changes", async () => {
+  const metaMaskProvider = createMockProvider();
+  const rabbyProvider = createMockProvider({ providerFlags: { isRabby: true } });
+  installMockWindow({ provider: { providers: [metaMaskProvider, rabbyProvider] } });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const unsubscribe = walletCore.subscribe(() => {});
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  assert.equal(metaMaskProvider.listenerCount("disconnect"), 1);
+  assert.equal(rabbyProvider.listenerCount("disconnect"), 0);
+
+  await walletCore.connect({ walletId: "legacy:rabby-2" });
+  assert.equal(metaMaskProvider.listenerCount("disconnect"), 0);
+  assert.equal(rabbyProvider.listenerCount("disconnect"), 1);
+  assert.deepEqual(metaMaskProvider.removeCalls, ["accountsChanged", "chainChanged", "disconnect"]);
+
+  unsubscribe();
 });
 
 test("disconnect clears wallet session state", async () => {
-  const storage = installMockWindow({ provider: createMockProvider() });
+  const provider = createMockProvider();
+  const storage = installMockWindow({ provider });
   const walletCore = createWalletCore({
     discoveryWaitMs: 0,
     storage,
@@ -363,4 +452,5 @@ test("disconnect clears wallet session state", async () => {
   assert.equal(state.selectedWalletId, null);
   assert.equal(walletCore.hasWalletSession(), false);
   assert.equal(storage.getItem("test:wallet-session"), null);
+  assert.equal(provider.listenerCount("disconnect"), 0);
 });

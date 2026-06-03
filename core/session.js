@@ -124,7 +124,7 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
     state.injectedProvider = null;
     state.providerSource = null;
     state.isConnecting = false;
-    discovery.applyActiveWallet(null);
+    discovery.clearActiveWallet();
   }
 
   function emitEvent(event, data) {
@@ -169,6 +169,16 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
       return;
     }
 
+    if (event === "providerDisconnected") {
+      if (!hasActiveConnectionState()) {
+        return;
+      }
+
+      resetConnectionState();
+      emitEvent("disconnected", null);
+      return;
+    }
+
     if (event === "providersChanged") {
       emitEvent("providersChanged", data);
       return;
@@ -192,6 +202,10 @@ export function createWalletSession({ discovery, storage, walletSessionKey = "li
 
   function getState() {
     return { ...state };
+  }
+
+  function hasActiveConnectionState() {
+    return Boolean(state.account || state.selectedWalletId || state.sessionWalletId);
   }
 
   function hasWalletSession() {
