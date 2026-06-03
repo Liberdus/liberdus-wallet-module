@@ -266,13 +266,13 @@ export function createWalletSession({
 
   async function resolveWalletSession(session) {
     const wallet = await discovery.resolveWalletById(session.walletId);
-    if (wallet) return wallet;
+    if (wallet) return { wallet, matchedBy: "walletId" };
 
     if (!session.rdns) return null;
 
     const wallets = await discovery.discoverWallets();
     const matches = wallets.filter((candidate) => normalizeSessionRdns(candidate.info?.rdns) === session.rdns);
-    return matches.length === 1 ? matches[0] : null;
+    return matches.length === 1 ? { wallet: matches[0], matchedBy: "rdns" } : null;
   }
 
   async function connect({ walletId } = {}) {
@@ -336,7 +336,8 @@ export function createWalletSession({
   async function syncState() {
     await initializeDiscoveryEvents();
     const session = getWalletSession();
-    const selectedWallet = session?.walletId ? await resolveWalletSession(session) : null;
+    const sessionMatch = session?.walletId ? await resolveWalletSession(session) : null;
+    const selectedWallet = sessionMatch?.wallet || null;
 
     if (session?.walletId && !selectedWallet) {
       resetConnectionState({ clearSession: false });
@@ -380,12 +381,12 @@ export function createWalletSession({
       const account = normalizeAddress(Array.isArray(accounts) ? accounts[0] : accounts);
       state.account = account;
       if (!account) {
-        resetConnectionState();
+        resetConnectionState({ clearSession: sessionMatch?.matchedBy !== "rdns" });
       } else {
         saveWalletSession(selectedWallet);
       }
     } catch {
-      resetConnectionState();
+      resetConnectionState({ clearSession: sessionMatch?.matchedBy !== "rdns" });
     }
 
     return state;
