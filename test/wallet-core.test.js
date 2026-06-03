@@ -4,6 +4,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { createWalletCore } from "../index.js";
 
 const ACCOUNT = "0x24f55B1e86D67ca62146618Ee486AA4DF611CDD4";
+const NEXT_ACCOUNT = "0x88dA9a35eF21c6a3c742aC2b8F46B940d42A7B5C";
 const WALLET_ICON = "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg'/>";
 
 let originalWindow;
@@ -42,6 +43,7 @@ function createMockProvider({
   account = ACCOUNT,
   chainId = "0x38",
   providerFlags = { isMetaMask: true },
+  revokePermissions = () => null,
 } = {}) {
   const listeners = new Map();
   const requests = [];
@@ -65,6 +67,7 @@ function createMockProvider({
       if (payload.method === "eth_requestAccounts") return [account];
       if (payload.method === "eth_accounts") return [account];
       if (payload.method === "eth_chainId") return chainId;
+      if (payload.method === "wallet_revokePermissions") return revokePermissions();
       throw new Error(`Unsupported request: ${payload.method}`);
     },
     on(event, handler) {
@@ -416,6 +419,17 @@ test("fallback provider disconnect after sync without a session does not emit di
   unsubscribe();
 });
 
+test("fallback accountsChanged without a session does not restore account", async () => {
+  const provider = createMockProvider();
+  installMockWindow({ provider });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  await walletCore.sync();
+  provider.emit("accountsChanged", [NEXT_ACCOUNT]);
+
+  assert.equal(walletCore.getState().account, null);
+});
+
 test("provider disconnect listener moves when active wallet changes", async () => {
   const metaMaskProvider = createMockProvider();
   const rabbyProvider = createMockProvider({ providerFlags: { isRabby: true } });
@@ -453,4 +467,80 @@ test("disconnect clears wallet session state", async () => {
   assert.equal(walletCore.hasWalletSession(), false);
   assert.equal(storage.getItem("test:wallet-session"), null);
   assert.equal(provider.listenerCount("disconnect"), 0);
+  assert.deepEqual(
+    provider.requests.find((request) => request.method === "wallet_revokePermissions"),
+    {
+      method: "wallet_revokePermissions",
+      params: [{ eth_accounts: {} }],
+    },
+  );
+});
+
+test("disconnect can skip wallet permission revocation", async () => {
+  const provider = createMockProvider();
+  installMockWindow({ provider });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  await walletCore.disconnect({ revokePermissions: false });
+
+  assert.equal(provider.requests.some((request) => request.method === "wallet_revokePermissions"), false);
+});
+
+test("disconnect can disable wallet permission revocation by default", async () => {
+  const provider = createMockProvider();
+  installMockWindow({ provider });
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    revokePermissionsOnDisconnect: false,
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  await walletCore.disconnect();
+
+  assert.equal(provider.requests.some((request) => request.method === "wallet_revokePermissions"), false);
+});
+
+test("disconnect clears local state when permission revocation fails", async () => {
+  const provider = createMockProvider({
+    revokePermissions: () => {
+      throw new Error("wallet_revokePermissions unsupported");
+    },
+  });
+  const storage = installMockWindow({ provider });
+  const walletCore = createWalletCore({
+    discoveryWaitMs: 0,
+    storage,
+    walletSessionKey: "test:wallet-session",
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  await walletCore.disconnect();
+
+  assert.equal(walletCore.getState().account, null);
+  assert.equal(walletCore.hasWalletSession(), false);
+  assert.equal(storage.getItem("test:wallet-session"), null);
+});
+
+test("disconnect emits one disconnected event when revocation clears accounts first", async () => {
+  let provider;
+  provider = createMockProvider({
+    revokePermissions: async () => {
+      provider.emit("accountsChanged", []);
+    },
+  });
+  installMockWindow({ provider });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const events = [];
+  const unsubscribe = walletCore.subscribe((event) => {
+    events.push(event);
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+  await walletCore.disconnect();
+
+  assert.equal(events.filter((event) => event === "disconnected").length, 1);
+  assert.equal(walletCore.getState().account, null);
+
+  unsubscribe();
 });
