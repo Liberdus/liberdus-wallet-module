@@ -210,6 +210,24 @@ test("discovers EVM wallets exposed through browser namespaces", async () => {
   assert.deepEqual(genericProvider.requests.map((request) => request.method), ["eth_chainId"]);
 });
 
+test("skips window aliases while probing namespace wallets", async () => {
+  const legacyProvider = createMockProvider();
+  const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
+
+  installMockWindow({ provider: legacyProvider });
+  window.self = window;
+  window.top = window;
+  window.parent = window;
+  window.trustwallet = { ethereum: trustProvider };
+
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const wallets = await walletCore.discoverWallets();
+
+  assert.deepEqual(wallets.map((wallet) => wallet.info.name), ["MetaMask", "Trust Wallet"]);
+  assert.deepEqual(legacyProvider.requests, []);
+  assert.deepEqual(trustProvider.requests.map((request) => request.method), ["eth_chainId"]);
+});
+
 test("filters non-EVM wallets exposed through browser namespaces", async () => {
   const trustProvider = createMockProvider({ providerFlags: { isTrustWallet: true } });
   const tonProvider = createMockProvider({ chainId: "ton-mainnet", providerFlags: {} });
