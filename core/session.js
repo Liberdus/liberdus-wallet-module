@@ -231,6 +231,9 @@ export function createWalletSession({
     }
 
     if (event === "providersChanged") {
+      if (hasActiveConnectionState()) {
+        updateInjectedProviderState();
+      }
       emitEvent("providersChanged", data);
       restoreSavedSession();
       return;

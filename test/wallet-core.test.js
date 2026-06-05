@@ -409,6 +409,33 @@ test("late EIP-6963 announcement restores a saved wallet session", async () => {
   unsubscribe();
 });
 
+test("late EIP-6963 replacement updates connected provider state", async () => {
+  const legacyProvider = createMockProvider();
+  const replacementProvider = createMockProvider({ providerFlags: {} });
+  installMockWindow({ provider: legacyProvider });
+  const walletCore = createWalletCore({ discoveryWaitMs: 0 });
+  const providerStateDuringEvents = [];
+  const unsubscribe = walletCore.subscribe((event) => {
+    if (event === "providersChanged") {
+      providerStateDuringEvents.push(walletCore.getState().injectedProvider);
+    }
+  });
+
+  await walletCore.connect({ walletId: "legacy:default" });
+
+  assert.equal(walletCore.getEip1193Provider(), legacyProvider);
+  assert.equal(walletCore.getState().injectedProvider, legacyProvider);
+
+  announceWallet("metamask-eip6963", "MetaMask", replacementProvider, { rdns: "io.metamask" });
+  await flushAsyncEvents();
+
+  assert.equal(walletCore.getEip1193Provider(), replacementProvider);
+  assert.equal(walletCore.getState().injectedProvider, replacementProvider);
+  assert.equal(providerStateDuringEvents.at(-1), replacementProvider);
+
+  unsubscribe();
+});
+
 test("sync restores a saved EIP-6963 wallet when uuid changes but rdns is stable", async () => {
   const { storage, walletCore } = createWalletCoreWithSession({
     walletId: "old-uuid",
