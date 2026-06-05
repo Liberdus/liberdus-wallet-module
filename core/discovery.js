@@ -43,6 +43,13 @@ function safeGetProperty(target, propertyName) {
   }
 }
 
+function isWindowLikeObject(value) {
+  if (!isObjectLike(value) || typeof window === "undefined") return false;
+  return value === window
+    || safeGetProperty(value, "window") === value
+    || safeGetProperty(value, "self") === value;
+}
+
 function safeGetNestedProperty(target, propertyNames) {
   return propertyNames.reduce((value, propertyName) => safeGetProperty(value, propertyName), target);
 }
@@ -521,9 +528,10 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
 
     const candidateChecks = [];
     const seenProviders = new Set();
+    const injectedProvider = safeGetProperty(window, "ethereum");
 
     function addProvider(provider, namespace) {
-      if (!isEip1193Provider(provider) || seenProviders.has(provider)) return;
+      if (provider === injectedProvider || !isEip1193Provider(provider) || seenProviders.has(provider)) return;
       seenProviders.add(provider);
       candidateChecks.push((async () => {
         if (!await isEvmProvider(provider)) return null;
@@ -545,7 +553,7 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
     for (const propertyName of propertyNames) {
       if (propertyName === "ethereum") continue;
       const value = safeGetProperty(window, propertyName);
-      if (!isObjectLike(value)) continue;
+      if (!isObjectLike(value) || isWindowLikeObject(value)) continue;
 
       addProvider(value, propertyName);
       addProvider(safeGetProperty(value, "ethereum"), propertyName);
@@ -565,7 +573,14 @@ export function createWalletDiscovery({ discoveryWaitMs = 250 } = {}) {
       : [];
     const uniqueProviders = [...new Set(rawProviders.filter(Boolean))]
       .filter((provider) => !namespaceCandidates.some((candidate) => candidate.provider === provider));
+    const directProvider = isEip1193Provider(ethereum)
+      && !Array.isArray(ethereum?.providers)
+      && !providerIds.get(ethereum)
+      && !hasDiscoveredEip6963Wallets()
+      ? [{ provider: ethereum, info: inferLegacyWalletInfo(ethereum) }]
+      : [];
     const candidateProviders = [
+      ...directProvider,
       ...namespaceCandidates,
       ...uniqueProviders.map((provider) => ({
         provider,
